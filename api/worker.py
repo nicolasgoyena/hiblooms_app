@@ -272,8 +272,7 @@ def run_visualization_job(
 
                 for idx in selected_indices:
                     mn, mx = vis_ranges.get(idx, (-0.1, 0.4))
-                    idx_layer = indices_image.select(idx).clip(aoi).updateMask(water_mask)
-                    layers[idx] = idx_layer.visualize(
+                    layers[idx] = indices_image.select(idx).visualize(
                         min=mn, max=mx, palette=index_palettes.get(idx, ["blue","green","yellow","red"])
                     ).getMapId()["tile_fetcher"].url_format
 
