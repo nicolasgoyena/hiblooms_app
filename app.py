@@ -1641,33 +1641,33 @@ with tab3:
             _fechas_unicas = sorted(set(
                 pd.to_datetime(f).strftime("%Y-%m-%d") for f in _available_dates
             ))
-            df_available = pd.DataFrame(_fechas_unicas, columns=["Fecha"])
-            df_available["Fecha"] = pd.to_datetime(df_available["Fecha"])
-            df_available["Fecha_str"] = df_available["Fecha"].dt.strftime("%d-%b")
-            df_available["y_base"] = 0
 
-            timeline_chart = alt.Chart(df_available).mark_tick(
-                thickness=3, size=25, color="#5297d2"
-            ).encode(
-                x=alt.X("Fecha:T", title=None, axis=alt.Axis(
-                    labelAngle=0, format="%d-%b", values=list(df_available["Fecha"])
-                )),
-                y=alt.Y("y_base:Q", axis=None),
-                tooltip=[alt.Tooltip("Fecha:T", title="Fecha", format="%d-%m-%Y")],
-            ).properties(height=80, width="container")
-
-            text_layer = alt.Chart(df_available).mark_text(
-                align="center", baseline="bottom", dy=-12, fontSize=12
-            ).encode(
-                x="Fecha:T",
-                y=alt.value(40),
-                text="Fecha_str:N",
-            )
-
-            st.altair_chart(
-                (timeline_chart + text_layer).configure_axis(labelFontSize=11, tickSize=0),
-                use_container_width=True,
-            )
+            # Renderizar como pills HTML — sin dependencia de Altair
+            _pills_html = """
+            <div style="display:flex; flex-wrap:wrap; gap:10px; padding:12px 0;">
+            """
+            for _f in _fechas_unicas:
+                _dt = pd.to_datetime(_f)
+                _dia = _dt.strftime("%d")
+                _mes = _dt.strftime("%b")
+                _anyo = _dt.strftime("%Y")
+                _pills_html += f"""
+                <div style="
+                    background-color: #5297d2;
+                    color: white;
+                    border-radius: 20px;
+                    padding: 6px 16px;
+                    font-family: Playfair Display, serif;
+                    font-size: 14px;
+                    font-weight: 500;
+                    white-space: nowrap;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+                ">
+                    📅 {_dia} {_mes} {_anyo}
+                </div>
+                """
+            _pills_html += "</div>"
+            st.markdown(_pills_html, unsafe_allow_html=True)
 
         with row2[1]:
             # Leyenda de índices y capas
