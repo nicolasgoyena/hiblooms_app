@@ -330,7 +330,7 @@ def run_visualization_job(
         update(job_id, "Finalizando…", 98)
 
         results = {
-            "available_dates":    available_dates,
+            "available_dates":    sorted(set(available_dates)),
             "selected_indices":   selected_indices,
             "data_time":          data_time,
             "cloud_results":      cloud_results,
