@@ -1614,12 +1614,6 @@ with tab3:
             st.session_state["available_dates"]    = _res.get("available_dates", [])
             st.session_state["selected_indices"]   = _res.get("selected_indices", [])
             st.session_state["urls_exportacion"]   = _res.get("urls_exportacion", [])
-            # ── DEBUG TEMPORAL ──
-            st.write("data_time:", len(_res.get("data_time", [])), "registros")
-            st.write("tile_urls:", len(_res.get("tile_urls", [])), "mapas")
-            st.write("available_dates:", len(_res.get("available_dates", [])), "fechas")
-            st.stop()
-            # ── FIN DEBUG ──
             del st.session_state["viz_job_id"]
             st.rerun()
 
@@ -1637,12 +1631,6 @@ with tab3:
     _selected_indices = st.session_state.get("selected_indices", selected_indices)
     _available_dates = st.session_state.get("available_dates", [])
 
-    # ── DEBUG TEMPORAL ──
-    st.write("DEBUG data_time:", len(_data_time))
-    st.write("DEBUG tile_urls:", len(st.session_state.get("viz_job_results", {}).get("tile_urls", [])))
-    st.write("DEBUG available_dates:", len(_available_dates))
-    st.write("DEBUG selected_indices:", _selected_indices)
-    # ── FIN DEBUG ──
     if _data_time or _available_dates:
         df_time = pd.DataFrame(_data_time)
 
