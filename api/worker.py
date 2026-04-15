@@ -251,8 +251,8 @@ def run_visualization_job(
                 image_date_fmt = _dt.strptime(image_date, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                 layers: Dict[str, str] = {}
 
-                # Recortar al AOI y enmascarar solo píxeles de agua
-                # En 2018 el agua puede tener SCL==2 además de SCL==6
+                # RGB simple — igual que el código original de app.py
+                # scaled_image ya está clippeada al AOI y escalada (0-1) en hiblooms_core
                 from datetime import datetime as _dt2
                 _year = _dt2.strptime(image_date, "%Y-%m-%d %H:%M:%S").year
                 scl = indices_image.select("SCL")
@@ -260,11 +260,10 @@ def run_visualization_job(
                     water_mask = scl.eq(6).Or(scl.eq(2))
                 else:
                     water_mask = scl.eq(6)
-                # scaled_image ya viene clippeada al AOI y escalada a reflectancia (0-1)
-                # gracias al fix en hiblooms_core.process_sentinel2
-                rgb_clipped = scaled_image.select(["B4", "B3", "B2"]).updateMask(water_mask)
-                layers["RGB"] = rgb_clipped.visualize(
-                    bands=["B4", "B3", "B2"], min=0.02, max=0.2, gamma=1.4
+                # Usar indices_image que tiene B4/B3/B2 ya escaladas (0-1) y clippeadas al AOI
+                # (mismo objeto que usa SCL e indices, que sí se ven bien)
+                layers["RGB"] = indices_image.visualize(
+                    bands=["B4", "B3", "B2"], min=0, max=0.3, gamma=1.4
                 ).getMapId()["tile_fetcher"].url_format
 
                 scl_colors = [
