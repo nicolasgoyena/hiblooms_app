@@ -1614,6 +1614,12 @@ with tab3:
             st.session_state["available_dates"]    = _res.get("available_dates", [])
             st.session_state["selected_indices"]   = _res.get("selected_indices", [])
             st.session_state["urls_exportacion"]   = _res.get("urls_exportacion", [])
+            # ── DEBUG TEMPORAL ──
+            st.write("data_time:", len(_res.get("data_time", [])), "registros")
+            st.write("tile_urls:", len(_res.get("tile_urls", [])), "mapas")
+            st.write("available_dates:", len(_res.get("available_dates", [])), "fechas")
+            st.stop()
+            # ── FIN DEBUG ──
             del st.session_state["viz_job_id"]
             st.rerun()
 
