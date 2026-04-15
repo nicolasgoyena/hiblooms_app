@@ -260,7 +260,9 @@ def run_visualization_job(
                     water_mask = scl.eq(6).Or(scl.eq(2))
                 else:
                     water_mask = scl.eq(6)
-                rgb_clipped = scaled_image.clip(aoi).updateMask(water_mask)
+                # Escalar bandas ópticas de DN (0-10000) a reflectancia (0-1)
+                rgb_scaled = scaled_image.select(["B4", "B3", "B2"]).divide(10000)
+                rgb_clipped = rgb_scaled.clip(aoi).updateMask(water_mask)
                 layers["RGB"] = rgb_clipped.visualize(
                     bands=["B4", "B3", "B2"], min=0.02, max=0.2, gamma=1.4
                 ).getMapId()["tile_fetcher"].url_format
