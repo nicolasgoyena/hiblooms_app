@@ -1643,42 +1643,29 @@ with tab3:
             ))
             df_available = pd.DataFrame(_fechas_unicas, columns=["Fecha"])
             df_available["Fecha"] = pd.to_datetime(df_available["Fecha"])
-            df_available["Fecha_str"] = df_available["Fecha"].dt.strftime("%d %b")
+            df_available["Fecha_str"] = df_available["Fecha"].dt.strftime("%d-%b")
             df_available["y_base"] = 0
 
-            # Puntos en la línea de tiempo
-            points = alt.Chart(df_available).mark_point(
-                size=120, filled=True, opacity=0.85
+            timeline_chart = alt.Chart(df_available).mark_tick(
+                thickness=3, size=25, color="#5297d2"
             ).encode(
                 x=alt.X("Fecha:T", title=None, axis=alt.Axis(
-                    labelAngle=0, format="%d %b", tickCount=len(_fechas_unicas)
+                    labelAngle=0, format="%d-%b", values=list(df_available["Fecha"])
                 )),
                 y=alt.Y("y_base:Q", axis=None),
                 tooltip=[alt.Tooltip("Fecha:T", title="Fecha", format="%d-%m-%Y")],
-                color=alt.value("#5297d2"),
-            )
-            # Etiquetas encima de cada punto
-            labels = alt.Chart(df_available).mark_text(
-                align="center", baseline="bottom", dy=-14, fontSize=12, fontWeight=500
+            ).properties(height=80, width="container")
+
+            text_layer = alt.Chart(df_available).mark_text(
+                align="center", baseline="bottom", dy=-12, fontSize=12
             ).encode(
                 x="Fecha:T",
-                y=alt.value(50),
+                y=alt.value(40),
                 text="Fecha_str:N",
-                color=alt.value("#475a23"),
             )
-            # Línea base que conecta los puntos
-            line = alt.Chart(df_available).mark_line(
-                strokeWidth=1.5, opacity=0.3
-            ).encode(
-                x="Fecha:T",
-                y="y_base:Q",
-                color=alt.value("#5297d2"),
-            )
+
             st.altair_chart(
-                (line + points + labels)
-                .properties(height=100, width="container")
-                .configure_axis(labelFontSize=12)
-                .configure_view(strokeWidth=0),
+                (timeline_chart + text_layer).configure_axis(labelFontSize=11, tickSize=0),
                 use_container_width=True,
             )
 
