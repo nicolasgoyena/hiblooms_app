@@ -251,9 +251,10 @@ def run_visualization_job(
                 image_date_fmt = _dt.strptime(image_date, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                 layers: Dict[str, str] = {}
 
-                # scaled_image ya viene escalada (0-1) y clippeada desde hiblooms_core
-                _rgb = scaled_image.select(["B4", "B3", "B2"])
-                layers["RGB"] = _rgb.visualize(
+                # RGB: igual que la app original — imagen completa sin clip adicional
+                # scaled_image está clippeada al AOI (píxeles null fuera = negro)
+                # Usamos unmask() para que los píxeles null sean transparentes
+                layers["RGB"] = scaled_image.select(["B4", "B3", "B2"]).unmask().visualize(
                     bands=["B4", "B3", "B2"], min=0, max=0.3, gamma=1.4
                 ).getMapId()["tile_fetcher"].url_format
 
