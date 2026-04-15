@@ -1566,7 +1566,7 @@ with tab3:
                             _resp = _requests.post(
                                 f"{_API_URL}/jobs/submit",
                                 json=_run_config,
-                                timeout=10,
+                                timeout=60,
                             )
                             if _resp.ok:
                                 _job_id = _resp.json()["job_id"]
