@@ -1,3 +1,4 @@
+# ── Dependencias de la app Streamlit (sin cambios respecto al original) ──────
 streamlit==1.43.2
 earthengine-api==1.5.7
 geemap==0.35.3
@@ -15,8 +16,17 @@ requests
 SQLAlchemy>=2.0
 psycopg2-binary
 python-dotenv
-
-
-
 joblib
 scikit-learn
+
+# ── Nuevas dependencias de la app (polling asíncrono) ────────────────────────
+streamlit-autorefresh>=0.0.1
+
+# ── Dependencias de la API (api/main.py + api/worker.py) ─────────────────────
+# Instalar solo en el servidor donde corra la API, no en Streamlit Cloud:
+#   pip install -r requirements.txt --extra-index-url ...
+# O mantener un requirements_api.txt separado si el despliegue lo requiere.
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.0.0
+pillow>=10.0.0
