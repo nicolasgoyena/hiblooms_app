@@ -236,7 +236,16 @@ import time
 from datetime import timedelta
 import json
 import numpy as np
+import requests as _requests
 from hiblooms_calibration import render_calibration_tab
+try:
+    from streamlit_autorefresh import st_autorefresh as _st_autorefresh
+    _AUTOREFRESH_AVAILABLE = True
+except ImportError:
+    _AUTOREFRESH_AVAILABLE = False
+
+# URL de la API de jobs asíncrona (configurar en .streamlit/secrets.toml como api_url)
+_API_URL = st.secrets.get("api_url", "http://localhost:8000")
 
 try:
     if "GEE_SERVICE_ACCOUNT_JSON" in st.secrets:
@@ -1530,611 +1539,206 @@ with tab3:
                         st.markdown("""- **MCI** ... (traducción EN del resumen)""")
 
                 # Botón fuera del if
+                # ── BOTÓN DE CÁLCULO ASÍNCRONO ──────────────────────────────────────────
                 calcular = st.button(t("btn.compute"))
-                
+
                 # Separador siempre visible
     st.markdown("<hr style='border: 1px solid #b4a89b; margin: 2rem 0;'>", unsafe_allow_html=True)
-        
-                # Procesamiento solo si se pulsa
-    if calcular:     
-                    with st.spinner("Calculando fechas disponibles..."):
-                        usar_csv_val = reservoir_name.lower() == "val" and int(max_cloud_percentage) == 60
-                        usar_csv_bellus = reservoir_name.lower() == "bellus" and int(max_cloud_percentage) == 60
-                
-                        if usar_csv_val or usar_csv_bellus:
-                            if usar_csv_val:
-                                url_csv = "fechas_validas_el_val_historico.csv"
-                            elif usar_csv_bellus:
-                                url_csv = "fechas_validas_bellus_historico.csv"
-                
-                            df_fechas = cargar_fechas_csv(url_csv)
-                
-                            if not df_fechas.empty and "Fecha" in df_fechas.columns:
-                                try:
-                                    start_dt = pd.to_datetime(start_date)
-                                    end_dt = pd.to_datetime(end_date)
-                
-                                    fechas_filtradas = df_fechas[
-                                        (df_fechas["Fecha"] >= start_dt) & (df_fechas["Fecha"] <= end_dt)
-                                    ]["Fecha"].dt.strftime("%Y-%m-%d").tolist()
-                
-                                    available_dates = sorted(fechas_filtradas)
-                
-                                    if available_dates:
-                                        df_fechas.set_index("Fecha", inplace=True)
-                
-                                        cloud_results = []
-                                        for f in available_dates:
-                                            try:
-                                                nubosidad = df_fechas.loc[f, "nubosidad"]
-                                            except Exception:
-                                                nubosidad = None
-                
-                                            cloud_results.append({
-                                                "Fecha": f,
-                                                "Hora": "00:00",
-                                                "Nubosidad aproximada (%)": round(nubosidad, 2) if nubosidad is not None else "Desconocida",
-                                                "Cobertura (%)": 100
-                                            })
-                
-                                        st.session_state["cloud_results"] = cloud_results
-                                    else:
-                                        available_dates = get_available_dates(aoi, start_date, end_date, max_cloud_percentage)
-                                except Exception:
-                                    available_dates = get_available_dates(aoi, start_date, end_date, max_cloud_percentage)
+
+                # Al pulsar el botón: construir el payload y enviarlo a la API de jobs
+    if calcular:
+                    if not selected_indices:
+                        st.warning("⚠️ Selecciona al menos un índice antes de calcular.")
+                    else:
+                        _run_config = {
+                            "workflow": "visualization",
+                            "reservoir": reservoir_name,
+                            "start_date": start_date,
+                            "end_date": end_date,
+                            "max_cloud_pct": int(max_cloud_percentage),
+                            "indices": selected_indices,
+                            "aoi_geojson": gdf.to_crs(epsg=4326).to_json(),
+                            "puntos_interes": {
+                                k: list(v) for k, v in puntos_interes.get(reservoir_name, {}).items()
+                            },
+                        }
+                        try:
+                            _resp = _requests.post(
+                                f"{_API_URL}/jobs/submit",
+                                json=_run_config,
+                                timeout=10,
+                            )
+                            if _resp.ok:
+                                _job_id = _resp.json()["job_id"]
+                                st.session_state["viz_job_id"] = _job_id
+                                st.session_state.pop("viz_job_results", None)
+                                st.session_state.pop("data_time", None)
+                                st.session_state["cloud_results"] = []
+                                st.session_state["used_cloud_results"] = []
+                                st.success(f"✅ Cálculo enviado (job `{_job_id}`). Los resultados aparecerán aquí en cuanto estén listos.")
                             else:
-                                available_dates = get_available_dates(aoi, start_date, end_date, max_cloud_percentage)
-                        else:
-                            available_dates = get_available_dates(aoi, start_date, end_date, max_cloud_percentage)
+                                st.error(f"❌ Error al enviar el job: {_resp.status_code} – {_resp.text}")
+                        except Exception as _e:
+                            st.error(f"❌ No se pudo conectar con la API de jobs: {_e}")
 
-                    
+    # ── PANEL DE ESTADO / POLLING ────────────────────────────────────────────────
+    # Se muestra siempre que haya un job en curso (sin bloquear la UI)
+    if "viz_job_id" in st.session_state and "viz_job_results" not in st.session_state:
+        if _AUTOREFRESH_AVAILABLE:
+            _st_autorefresh(interval=5000, key="viz_job_poller")
 
-                        if not available_dates:
-                            st.warning(t("warn.no_imgs"))
-                            st.session_state["data_time"] = []
-                            st.stop()
+        _job_id = st.session_state["viz_job_id"]
+        try:
+            _status = _requests.get(
+                f"{_API_URL}/jobs/{_job_id}/status", timeout=5
+            ).json()
+        except Exception:
+            _status = {"state": "unknown"}
 
-                        if available_dates:
-                            # Asegura que sólo índices permitidos para el embalse pasen a session_state
-                            allowed = set(get_available_indices_for_reservoir(reservoir_name))
-                            selected_indices = [i for i in selected_indices if i in allowed]
+        _state = _status.get("state", "unknown")
 
-                            st.session_state['available_dates'] = available_dates
-                            st.session_state['selected_indices'] = selected_indices
+        if _state == "running":
+            _pct  = _status.get("progress", 0)
+            _step = _status.get("step", "Procesando…")
+            st.progress(_pct / 100, text=f"⏳ {_step}")
+            if not _AUTOREFRESH_AVAILABLE:
+                st.info("Recarga la página para actualizar el estado del cálculo.")
 
-                            st.subheader(t("avail.h"))
+        elif _state == "done":
+            st.session_state["viz_job_results"] = _status.get("results", {})
+            # Reconstruir session_state que usaban los widgets de resultados
+            _res = st.session_state["viz_job_results"]
+            st.session_state["data_time"]          = _res.get("data_time", [])
+            st.session_state["cloud_results"]      = _res.get("cloud_results", [])
+            st.session_state["used_cloud_results"] = _res.get("used_cloud_results", [])
+            st.session_state["available_dates"]    = _res.get("available_dates", [])
+            st.session_state["selected_indices"]   = _res.get("selected_indices", [])
+            st.session_state["urls_exportacion"]   = _res.get("urls_exportacion", [])
+            del st.session_state["viz_job_id"]
+            st.rerun()
 
-                            df_available = pd.DataFrame(available_dates, columns=["Fecha"])
-                            df_available["Fecha"] = pd.to_datetime(df_available["Fecha"])
-                            df_available["Fecha_str"] = df_available["Fecha"].dt.strftime("%d-%b")
-                            
-                            # Línea base ficticia para separar los ticks visualmente
-                            df_available["y_base"] = 0
-                            
-                            timeline_chart = alt.Chart(df_available).mark_tick(thickness=2, size=20).encode(
-                                x=alt.X("Fecha:T", title=None, axis=alt.Axis(labelAngle=0, format="%d-%b")),
-                                y=alt.Y("y_base:Q", axis=None),
-                                tooltip=alt.Tooltip("Fecha:T", title="Fecha")
-                            ).properties(
-                                height=100,
-                                width="container"
-                            )
-                            
-                            # Etiquetas más arriba
-                            text_layer = alt.Chart(df_available).mark_text(
-                                align="center",
-                                baseline="bottom",
-                                dy=-15,  # Más separación vertical
-                                fontSize=11
-                            ).encode(
-                                x="Fecha:T",
-                                y=alt.value(30),  # Coloca el texto más arriba que el tick
-                                text="Fecha_str:N"
-                            )
-                            
-                            # Combina y configura
-                            final_chart = (timeline_chart + text_layer).configure_axis(
-                                labelFontSize=12,
-                                tickSize=5
-                            )
-                            st.altair_chart(final_chart, use_container_width=True)
-                            # Procesar y visualizar resultados
-                            data_time = []
+        elif _state == "error":
+            st.error(f"❌ El workflow falló: {_status.get('error', 'error desconocido')}")
+            del st.session_state["viz_job_id"]
 
-                            # Determinar si se seleccionaron índices de clorofila o de ficocianina
-                            clorofila_indices = {"MCI", "NDCI_ind", "Chla_Val_cal", "Chla_Bellus_cal"}
-                            ficocianina_indices = {"UV_PC_Gral_cal","PC_Val_cal", "PCI_B5/B4","PC_Bellus_cal"}
-                            
-                            hay_clorofila = any(indice in selected_indices for indice in clorofila_indices)
-                            hay_ficocianina = any(indice in selected_indices for indice in ficocianina_indices)
-                            
-                            # El Val: añadir datos de SAICA solo si se han seleccionado índices de ficocianina
-                            if reservoir_name.lower() == "val" and hay_ficocianina:
-                                urls_csv = [
-                                    "https://drive.google.com/uc?id=1-FpLJpudQd69r9JxTbT1EhHG2swASEn-&export=download",
-                                    "https://drive.google.com/uc?id=1w5vvpt1TnKf_FN8HaM9ZVi3WSf0ibxlV&export=download"
-                                ]
-                                df_list = [cargar_csv_desde_url(url) for url in urls_csv]
-                                df_list = [df for df in df_list if not df.empty]
-                            
-                                if df_list:
-                                    df_fico = pd.concat(df_list).sort_values('Fecha-hora')
-                                    start_dt = pd.to_datetime(start_date)
-                                    end_dt = pd.to_datetime(end_date)
-                                    df_filtrado = df_fico[(df_fico['Fecha-hora'] >= start_dt) & (df_fico['Fecha-hora'] <= end_dt)]
-                            
-                                    for _, row in df_filtrado.iterrows():
-                                        data_time.append({
-                                            "Point": "SAICA_Val",
-                                            "Date": row["Fecha-hora"],
-                                            "Ficocianina (µg/L)": row["Ficocianina (µg/L)"],
-                                            "Tipo": "Valor Real"
-                                        })
-                            
-                 
-                            # Guardar data_time solo después de añadir (o no) los datos SAICA
-                            st.session_state['data_time'] = data_time
+        else:
+            st.info("⏳ Esperando respuesta del servidor de jobs…")
 
-                            # Paleta de colores para SCL con una mejor diferenciación
-                            scl_palette = {
-                                1: '#ff0004', 2: '#000000', 3: '#8B4513', 4: '#00FF00',
-                                5: '#FFD700', 6: '#0000FF', 7: '#F4EEEC', 8: '#C8C2C0',
-                                9: '#706C6B', 10: '#87CEFA', 11: '#00FFFF'
-                            }
-                            scl_colors = [scl_palette[i] for i in sorted(scl_palette.keys())]
+    # ── RENDERIZADO DE RESULTADOS ────────────────────────────────────────────────
+    # Se activa cuando los resultados ya están en session_state
+    # (igual que antes, pero leyendo de session_state en vez de calcular en vivo)
+    _data_time       = st.session_state.get("data_time", [])
+    _selected_indices = st.session_state.get("selected_indices", selected_indices)
+    _available_dates = st.session_state.get("available_dates", [])
 
-                            # Antes de la iteración, limpia las listas de imágenes y fechas
-                            if "image_list" in st.session_state:
-                                st.session_state["image_list"] = []
-                            if "selected_dates" in st.session_state:
-                                st.session_state["selected_dates"] = []
-                            
-                            # Proceso de las fechas
-                            for day in available_dates:
-                                # Procesar la imagen para cada fecha
-                                scaled_image, indices_image, image_date = process_sentinel2(aoi, day, max_cloud_percentage, selected_indices)
-                                if indices_image is not None:
-                                    # Añadir solo las imágenes y fechas necesarias (una vez por fecha)
-                                    st.session_state["image_list"].append(indices_image)
-                                    st.session_state["selected_dates"].append(day)
-                                    
-                                    # Para cada índice, calcular la distribución por clases
-                                    for index_name in selected_indices:
-                                        # Verifica que los valores de min y max son adecuados
-                                        min_val, max_val = -0.1, 0.4  # valores por defecto
-                                        if index_name == "PC_Val_cal":
-                                            min_val, max_val = 0, 7
-                                        elif index_name == "Chla_Val_cal":
-                                            min_val, max_val = 0, 150
-                                        elif index_name == "Chla_Bellus_cal":
-                                            min_val, max_val = 5, 100
-                                        elif index_name == "PC_Bellus_cal":
-                                            min_val, max_val = 25, 500
-                                        elif index_name == "PCI_B5/B4":
-                                            min_val, max_val = 0.5, 1.5
-                                        elif index_name == "UV_PC_Gral_cal":
-                                            min_val, max_val = 0, 100
-                            
-                                        bins = np.linspace(min_val, max_val, 6)  # Usamos 6 bins de forma estándar
-                            
-                                        # Llamar a la función para calcular la distribución por clases
-                                        result = calcular_distribucion_area_por_clases(indices_image, index_name, aoi, bins)
-                                if indices_image is not None:
-                                    url = generar_url_geotiff_multibanda(indices_image, selected_indices, aoi)
-                                
-                                    if "urls_exportacion" not in st.session_state:
-                                        st.session_state["urls_exportacion"] = []
-                                
-                                    if url:
-                                        st.session_state["urls_exportacion"].append({
-                                            "fecha": day,
-                                            "url": url
-                                        })
+    if _data_time or _available_dates:
+        df_time = pd.DataFrame(_data_time)
 
-                                if indices_image is None:
-                                    continue
+        # Timeline de fechas disponibles
+        if _available_dates:
+            st.subheader(t("avail.h"))
+            df_available = pd.DataFrame(_available_dates, columns=["Fecha"])
+            df_available["Fecha"] = pd.to_datetime(df_available["Fecha"])
+            df_available["Fecha_str"] = df_available["Fecha"].dt.strftime("%d-%b")
+            df_available["y_base"] = 0
+            timeline_chart = alt.Chart(df_available).mark_tick(thickness=2, size=20).encode(
+                x=alt.X("Fecha:T", title=None, axis=alt.Axis(labelAngle=0, format="%d-%b")),
+                y=alt.Y("y_base:Q", axis=None),
+                tooltip=alt.Tooltip("Fecha:T", title="Fecha"),
+            ).properties(height=100, width="container")
+            text_layer = alt.Chart(df_available).mark_text(
+                align="center", baseline="bottom", dy=-15, fontSize=11
+            ).encode(
+                x="Fecha:T",
+                y=alt.value(30),
+                text="Fecha_str:N",
+            )
+            st.altair_chart(
+                (timeline_chart + text_layer).configure_axis(labelFontSize=12, tickSize=5),
+                use_container_width=True,
+            )
 
-                                if reservoir_name in puntos_interes and puntos_interes[reservoir_name]:
-                                    for point_name, (lat_point, lon_point) in puntos_interes[reservoir_name].items():
-                                        values = get_values_at_point(lat_point, lon_point, indices_image, selected_indices)
-                                        registro = {"Point": point_name, "Date": day, "Tipo": "Valor Estimado"}
-                                    
-                                        if hay_clorofila:
-                                            for indice in clorofila_indices:
-                                                if indice in values and values[indice] is not None:
-                                                    registro[indice] = values[indice]
-                                        if hay_ficocianina:
-                                            for indice in ficocianina_indices:
-                                                if indice in values and values[indice] is not None:
-                                                    registro[indice] = values[indice]
-                                    
-                                        if any(k in registro for k in clorofila_indices.union(ficocianina_indices)):
-                                            data_time.append(registro)
+        with row2[1]:
+            # Leyenda de índices y capas
+            with st.expander(t("legend.exp"), expanded=False):
+                generar_leyenda(_selected_indices)
 
+            # Tabla de nubosidad estimada por imagen
+            if st.session_state.get("used_cloud_results"):
+                with st.expander(t("cloud.exp"), expanded=False):
+                    df_results = pd.DataFrame(st.session_state["used_cloud_results"]).copy()
+                    df_results["Fecha"] = pd.to_datetime(df_results["Fecha"], errors="coerce").dt.strftime("%d-%m-%Y")
+                    df_results = df_results.rename(columns={
+                        "Fecha": t("col.date"),
+                        "Hora": t("col.time"),
+                        "Nubosidad aproximada (%)": t("col.cloud"),
+                    })
+                    st.dataframe(df_results)
 
-                                # Añadir media diaria del embalse solo en píxeles con SCL == 6
-                                for index in selected_indices:
-                                    if (hay_clorofila and index in clorofila_indices) or (hay_ficocianina and index in ficocianina_indices):
-                                        media_valor = calcular_media_diaria_embalse(indices_image, index, aoi)
-                                        if media_valor is None:
-                                            st.warning(f"📅 En el día {day} no se ha podido calcular la media del índice '{index}' porque el embalse estaba completamente cubierto de nubes.")
-                                        if media_valor is not None:
-                                            data_time.append({
-                                                "Point": "Media_Embalse",
-                                                "Date": day,
-                                                index: media_valor,
-                                                "Tipo": "Valor Estimado"
-                                            })
+            # Gráfico de media diaria del embalse
+            with st.expander(t("mean.exp"), expanded=False):
+                if not df_time.empty:
+                    df_media = df_time[df_time["Point"] == "Media_Embalse"].copy()
+                    df_media["Date"] = pd.to_datetime(df_media["Date"], errors="coerce")
+                    for indice in _selected_indices:
+                        if indice in df_media.columns:
+                            df_indice = df_media[["Date", indice]].dropna()
+                            y_title = t("axis.conc") if "cal" in indice.lower() else t("axis.idx")
+                            chart = alt.Chart(df_indice).mark_bar().encode(
+                                x=alt.X("Date:T", title=t("col.date"), axis=alt.Axis(format="%d-%b", labelAngle=0)),
+                                y=alt.Y(f"{indice}:Q", title=y_title),
+                                tooltip=[
+                                    alt.Tooltip("Date:T", title=t("col.date")),
+                                    alt.Tooltip(f"{indice}:Q", title=indice),
+                                ],
+                            ).properties(title=f"{t('mean.index')}: {indice}", width=500, height=300)
+                            st.altair_chart(chart, use_container_width=True)
 
-                                index_palettes = {
-                                    "MCI": ['blue', 'green', 'yellow', 'red'],
-                                    "PCI_B5/B4": ["#ADD8E6", "#008000", "#FFFF00", "#FF0000"],  # PCI
-                                    "NDCI_ind": ['blue', 'green', 'yellow', 'red'],
-                                    "UV_PC_Gral_cal": ['#2171b5', '#c7e9c0', '#238b45', '#e31a1c'],
-                                    "PC_Val_cal": ["#ADD8E6", "#008000", "#FFFF00", "#FF0000"],  # Paleta específica para PC
-                                    "Chla_Val_cal": ['#2171b5', '#c7e9c0', '#238b45', '#e31a1c'],
-                                    "Chla_Bellus_cal": ['#2171b5', '#c7e9c0', '#238b45', '#e31a1c'],
-                                    "PC_Bellus_cal": ['#2171b5', '#c7e9c0', '#238b45', '#e31a1c']
-                                }
-                                with row2[0]:
-                                    image_date_fmt = datetime.strptime(image_date, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y %H:%M")
-                                    with st.expander(f"{t('map.index.for')} {image_date_fmt}"):
-                                        gdf_4326 = gdf.to_crs(epsg=4326)
-                                        map_center = [gdf_4326.geometry.centroid.y.mean(),
-                                                      gdf_4326.geometry.centroid.x.mean()]
-                                        map_indices = geemap.Map(center=map_center, zoom=13)
-                                        
-                                        # Crear grupos de capas para permitir que solo una se active a la vez
-                                        rgb_layer = folium.raster_layers.TileLayer(
-                                            tiles=scaled_image.visualize(bands=['B4', 'B3', 'B2'], min=0, max=0.3,
-                                                                         gamma=1.4).getMapId()[
-                                                "tile_fetcher"].url_format,
-                                            name=t("map.rgb"),
-                                            overlay=True,
-                                            control=True,
-                                            show=True,  # Mostrar esta por defecto
-                                            attr="Copernicus Sentinel-2, processed by GEE"
-                                        )
+        with row2[0]:
+            # Mapas por fecha — disponibles si el worker devolvió tile_urls en results
+            _tile_data = st.session_state.get("viz_job_results", {}).get("tile_urls", [])
+            _scl_palette = {
+                1: "#ff0004", 2: "#000000", 3: "#8B4513", 4: "#00FF00",
+                5: "#FFD700", 6: "#0000FF", 7: "#F4EEEC", 8: "#C8C2C0",
+                9: "#706C6B", 10: "#87CEFA", 11: "#00FFFF",
+            }
+            _scl_colors = [_scl_palette[i] for i in sorted(_scl_palette.keys())]
+            for _entry in _tile_data:
+                _image_date_fmt = _entry.get("date", "")
+                with st.expander(f"{t('map.index.for')} {_image_date_fmt}"):
+                    if gdf is not None:
+                        _gdf_4326 = gdf.to_crs(epsg=4326)
+                        _map_center = [
+                            _gdf_4326.geometry.centroid.y.mean(),
+                            _gdf_4326.geometry.centroid.x.mean(),
+                        ]
+                    else:
+                        _map_center = [41.0, -1.5]
+                    _map_indices = geemap.Map(center=_map_center, zoom=13)
+                    for _lname, _url in _entry.get("layers", {}).items():
+                        folium.raster_layers.TileLayer(
+                            tiles=_url,
+                            name=_lname,
+                            overlay=True,
+                            control=True,
+                            show=(_lname == t("map.rgb")),
+                            attr="Copernicus Sentinel-2, processed by GEE",
+                        ).add_to(_map_indices)
+                    _poi_group = folium.FeatureGroup(name=t("map.poi"), show=False)
+                    for _pname, (_plat, _plon) in puntos_interes.get(reservoir_name, {}).items():
+                        folium.Marker(
+                            location=[_plat, _plon],
+                            popup=_pname,
+                            tooltip=_pname,
+                            icon=folium.Icon(color="red", icon="info-sign"),
+                        ).add_to(_poi_group)
+                    _poi_group.add_to(_map_indices)
+                    folium.LayerControl(collapsed=False, position="topright").add_to(_map_indices)
+                    folium_static(_map_indices)
 
-                                        scl_layer = folium.raster_layers.TileLayer(
-                                            tiles=indices_image.select('SCL').visualize(min=1, max=11,
-                                                                                        palette=scl_colors).getMapId()[
-                                                "tile_fetcher"].url_format,
-                                            name=t("map.scl"),
-                                            overlay=True,
-                                            control=True,
-                                            show=False,
-                                            attr="Copernicus Sentinel-2, processed by GEE"
-                                        )
-
-                                        cloud_layer = folium.raster_layers.TileLayer(
-                                            tiles=indices_image.select('MSK_CLDPRB').visualize(min=0, max=100,
-                                                                                               palette=['blue', 'green',
-                                                                                                        'yellow', 'red',
-                                                                                                        'black']).getMapId()[
-                                                "tile_fetcher"].url_format,
-                                            name=t("map.cloudprob"),
-                                            overlay=True,
-                                            control=True,
-                                            show=False,
-                                            attr="Copernicus Sentinel-2, processed by GEE"
-                                        )
-
-                                        # Crear el grupo de puntos de interés (no activado por defecto)
-                                        poi_group = folium.FeatureGroup(name=t("map.poi"), show=False)
-                                        tiene_puntos = False  # Variable de control
-                                        
-                                        # Añadir marcadores al grupo si existen
-                                        if reservoir_name in puntos_interes:
-                                            for point_name, (lat_point, lon_point) in puntos_interes[reservoir_name].items():
-                                                folium.Marker(
-                                                    location=[lat_point, lon_point],
-                                                    popup=f"{point_name}",
-                                                    tooltip=f"{point_name}",
-                                                    icon=folium.Icon(color="red", icon="info-sign")
-                                                ).add_to(poi_group)
-                                                tiene_puntos = True  # Al menos un punto añadido
-                                        
-
-                                        # Agregar capas al mapa
-                                        rgb_layer.add_to(map_indices)
-                                        scl_layer.add_to(map_indices)
-                                        cloud_layer.add_to(map_indices)
-                                        if tiene_puntos:
-                                            poi_group.add_to(map_indices)
-
-                                        # Agregar los índices como capas opcionales
-                                        for index in selected_indices:
-                                            vis_params = {"min": -0.1, "max": 0.4, "palette": index_palettes.get(index,
-                                                                                                                 [
-                                                                                                                     'blue',
-                                                                                                                     'green',
-                                                                                                                     'yellow',
-                                                                                                                     'red'])}
-                                            if index == "PC_Val_cal":
-                                                vis_params["min"] = 0
-                                                vis_params["max"] = 5
-                                                vis_params["palette"] = ["#ADD8E6", "#008000", "#FFFF00", "#FF0000"]
-                                            elif index == "PCI_B5/B4":
-                                                vis_params["min"] = 0.5
-                                                vis_params["max"] = 1.5
-                                                vis_params["palette"] = ["#ADD8E6", "#008000", "#FFFF00", "#FF0000"]
-                                            elif index == "Chla_Val_cal":
-                                                vis_params["min"] = 0
-                                                vis_params["max"] = 150
-                                                vis_params["palette"] = ['#2171b5', '#75ba82', '#fdae61', '#e31a1c']
-                                            elif index == "Chla_Bellus_cal":
-                                                vis_params["min"] = 5
-                                                vis_params["max"] = 100
-                                                vis_params["palette"] = ['#2171b5', '#75ba82', '#fdae61', '#e31a1c']
-                                            elif index == "PC_Bellus_cal":
-                                                vis_params["min"] = 25
-                                                vis_params["max"] = 500
-                                                vis_params["palette"] = ['#2171b5', '#75ba82', '#fdae61', '#e31a1c']
-                                            elif index == "UV_PC_Gral_cal":
-                                                vis_params["min"] = 0
-                                                vis_params["max"] = 100
-                                                vis_params["palette"] = ['#2171b5', '#75ba82', '#fdae61', '#e31a1c']
-
-
-                                            index_layer = folium.raster_layers.TileLayer(
-                                                tiles=indices_image.select(index).visualize(**vis_params).getMapId()[
-                                                    "tile_fetcher"].url_format,
-                                                name=index,
-                                                overlay=True,
-                                                control=True,
-                                                show=False,
-                                                attr="Copernicus Sentinel-2, processed by GEE"
-                                            )
-                                            index_layer.add_to(map_indices)
-
-                                        # Agregar el control de capas con opción exclusiva
-                                        folium.LayerControl(collapsed=False, position='topright').add_to(map_indices)
-
-                                        # Mostrar el mapa en Streamlit
-                                        folium_static(map_indices)
-
-                            st.session_state['data_time'] = data_time
-
-                        df_time = pd.DataFrame(data_time)
-
-                        with row2[1]:
-                            # Leyenda de índices y capas
-                            with st.expander(t("legend.exp"), expanded=False):
-                                generar_leyenda(selected_indices)
-                        
-                            # Tabla de nubosidad estimada por imagen
-                            if "used_cloud_results" in st.session_state and st.session_state["used_cloud_results"]:
-                                with st.expander(t("cloud.exp"), expanded=False):
-                                    df_results = pd.DataFrame(st.session_state["used_cloud_results"]).copy()
-                                    df_results["Fecha"] = pd.to_datetime(df_results["Fecha"], errors='coerce').dt.strftime("%d-%m-%Y")
-                                    df_results = df_results.rename(columns={"Fecha": t("col.date"), "Hora": t("col.time"), "Nubosidad aproximada (%)": t("col.cloud")})
-                                    st.dataframe(df_results)
-
-                            with st.expander(t("mean.exp"), expanded=False):
-                                df_media = df_time[df_time["Point"] == "Media_Embalse"].copy()
-                                df_media["Date"] = pd.to_datetime(df_media["Date"], errors='coerce')
-                            
-                                for indice in selected_indices:
-                                    if indice in df_media.columns:
-                                        df_indice = df_media[["Date", indice]].dropna()
-                                        y_title = t("axis.conc") if 'cal' in indice.lower() else t("axis.idx")
-                                        chart = alt.Chart(df_indice).mark_bar().encode(
-                                            x=alt.X('Date:T', title=t("col.date"), axis=alt.Axis(format="%d-%b", labelAngle=0)),
-                                            y=alt.Y(f'{indice}:Q', title=y_title),
-                                            tooltip=[alt.Tooltip('Date:T', title=t("col.date")), alt.Tooltip(f'{indice}:Q', title=f'{indice}')]
-                                        ).properties(title=f"{t('mean.index')}: {indice}", width=500, height=300)
-                                        st.altair_chart(chart, use_container_width=True)
-
-
-                            # Dentro de tu código de interfaz para visualizar las distribuciones
-                            if "image_list" in st.session_state and "selected_dates" in st.session_state:
-                                with st.expander("📊 Distribución diaria por clases del índice en el embalse", expanded=False):
-                            
-                                    data = []  # Guardamos todos los resultados
-                            
-                                    # Recorremos imágenes y fechas
-                                    for i, (img, fecha_str) in enumerate(zip(st.session_state["image_list"], st.session_state["selected_dates"])):
-                                        fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-                            
-                                        for index_name in st.session_state["selected_indices"]:
-                            
-                                            # Obtener min/max según índice
-                                            min_val, max_val, palette = -0.1, 0.4, ['blue', 'green', 'yellow', 'red']
-                            
-                                            if index_name == "PC_Val_cal":
-                                                min_val, max_val = 0, 25
-                                                palette = ["#ADD8E6", "#008000", "#FFFF00", "#FF8000", "#FF0000"]
-                                            elif index_name == "Chla_Val_cal":
-                                                min_val, max_val = 0, 150
-                                                palette = ['#2171b5', '#75ba82', '#fdae61', '#e31a1c']
-                                            elif index_name == "Chla_Bellus_cal":
-                                                min_val, max_val = 5, 100
-                                                palette = ['#2171b5', '#75ba82', '#fdae61', '#e31a1c']
-                                            elif index_name == "PC_Bellus_cal":
-                                                min_val, max_val = 25, 500
-                                                palette = ['#2171b5', '#75ba82', '#fdae61', '#e31a1c']
-                                            elif index_name == "UV_PC_Gral_cal":
-                                                min_val, max_val = 0, 100
-                                                palette = ['#2171b5', '#75ba82', '#fdae61', '#e31a1c']
-                            
-                                            # Crear bins según índice
-                                            if index_name == "PC_Val_cal":
-                                                bins = np.linspace(min_val, max_val, 6)  # 5 clases
-                                            else:
-                                                bins = np.linspace(min_val, max_val, 5)  # 4 clases
-                            
-                                            # Crear bin_labels ESTABLES para este índice
-                                            bin_labels = [f"{bins[i]:.2f}–{bins[i+1]:.2f}" for i in range(len(bins) - 1)]
-                            
-                                            # Obtener distribución
-                                            result = calcular_distribucion_area_por_clases(img, index_name, aoi, bins)
-                            
-                                            if result:
-                                                df_distribution = pd.DataFrame(result)
-                            
-                                                # Normalizar rangos
-                                                df_distribution["rango"] = df_distribution["rango"].str.replace("–", "-", regex=False)
-                            
-                                                def norm_r(r):
-                                                    try:
-                                                        lo, hi = r.split("-")
-                                                        return f"{float(lo):.2f}–{float(hi):.2f}"
-                                                    except:
-                                                        return None
-                            
-                                                df_distribution["rango"] = df_distribution["rango"].apply(norm_r)
-                                                df_distribution = df_distribution.dropna(subset=["rango"])
-                            
-                                                # Añadir resultados + bins correctos para este índice
-                                                for row in df_distribution.itertuples():
-                                                    data.append({
-                                                        "Fecha": fecha,
-                                                        "Rango": row.rango,
-                                                        "Porcentaje": row.porcentaje,
-                                                        "Índice": index_name,
-                                                        "Bins": bin_labels.copy(),       # <--- BINS CORRECTOS
-                                                        "Palette": palette.copy()        # <--- PALETA POR ÍNDICE
-                                                    })
-                            
-                                    # ===========================
-                                    #   GENERAR EL GRÁFICO
-                                    # ===========================
-                                    if data:
-                                        df_final = pd.DataFrame(data)
-                            
-                                        # Obtener TODOS los bins usados realmente:
-                                        all_bin_labels = sorted(
-                                            set(label for lst in df_final["Bins"] for label in lst),
-                                            key=lambda x: float(x.split("–")[0])
-                                        )
-                            
-                                        # Seleccionar una paleta (si hay varios índices, coger primero)
-                                        palette = df_final["Palette"].iloc[0]
-                            
-                                        # Forzar categorías estables
-                                        df_final["Rango"] = pd.Categorical(
-                                            df_final["Rango"],
-                                            categories=all_bin_labels,
-                                            ordered=True
-                                        )
-                            
-                                        # Crear gráfico
-                                        chart = alt.Chart(df_final).mark_bar(size=25).encode(
-                                            x=alt.X('Fecha:T', title='Fecha'),
-                                            y=alt.Y('Porcentaje:Q', title='Porcentaje de área (%)', stack='zero'),
-                                            color=alt.Color(
-                                                'Rango:N',
-                                                scale=alt.Scale(domain=all_bin_labels, range=palette),
-                                                legend=alt.Legend(title="Rango de valores")
-                                            )
-                                        ).properties(
-                                            title=f"Distribución de las clases del índice por fecha",
-                                            width=800,
-                                            height=400
-                                        )
-                            
-                                        st.warning("⚠️ El gráfico de distribución por clases no está disponible temporalmente.")
-
-
-                                        
-                            # Serie temporal real de ficocianina (solo si embalse es VAL)
-                            if reservoir_name.lower() == "val" and "PC_Val_cal" in selected_indices:
-                                with st.expander("📈 Serie temporal real de ficocianina (sonda SAICA)", expanded=False):
-                                    estacion = 945  # El Val
-                            
-                                    # Convertir las fechas seleccionadas al formato que usa SAICA
-                                    fecha_ini = pd.to_datetime(start_date).strftime("%d-%m-%Y")
-                                    fecha_fin = pd.to_datetime(end_date).strftime("%d-%m-%Y")
-                            
-                                    # Construir la URL de la tabla de datos en SAICA
-                                    url_saica = (
-                                        f"https://saica.chebro.es/fichaDataTabla.php?"
-                                        f"estacion={estacion}&fini={fecha_ini}&ffin={fecha_fin}"
-                                    )
-                            
-                                    st.markdown(
-                                        f"""
-                                        🔗 Puedes consultar los datos reales de **ficocianina** directamente en la web de SAICA (Confederación Hidrográfica del Ebro):
-                            
-                                        👉 [Abrir tabla de datos en SAICA]({url_saica})
-                                        """,
-                                        unsafe_allow_html=True,
-                                    )
-                            
-                                    st.caption(
-                                        f"(El enlace abrirá los datos entre {fecha_ini} y {fecha_fin} para la estación de El Val – SAICA.)"
-                                    )
-                                       
-
-                            if reservoir_name.lower() == "val" and hay_clorofila:
-                                with st.expander("📈 Valores reales de clorofila-a (valores de sonda Aquadam en 41.8761,-1.7883)", expanded=False):
-                                    url_cloro_val = "clorofila_val_entero.csv"
-                                    try:
-                                        df_cloro = pd.read_csv(url_cloro_val)
-                            
-                                        # Asegurar que están las columnas necesarias
-                                        if "Fecha" in df_cloro.columns and "Clorofila (µg/L)" in df_cloro.columns:
-                                            df_cloro["Fecha-hora"] = pd.to_datetime(df_cloro["Fecha"])
-                                            df_cloro = df_cloro[["Fecha-hora", "Clorofila (µg/L)"]]
-                            
-                                            start_dt = pd.to_datetime(start_date)
-                                            end_dt = pd.to_datetime(end_date)
-                            
-                                            df_filtrado = df_cloro[(df_cloro["Fecha-hora"] >= start_dt) & (df_cloro["Fecha-hora"] <= end_dt)]
-                            
-                                            if df_filtrado.empty:
-                                                st.warning("⚠️ No hay datos de clorofila en el rango de fechas seleccionado.")
-                                            else:
-                                                max_puntos_grafico = 500
-                                                step = max(1, len(df_filtrado) // max_puntos_grafico)
-                                                df_subsample = df_filtrado.iloc[::step]
-                                                df_subsample["Fecha_formateada"] = df_subsample["Fecha-hora"].dt.strftime("%d-%m-%Y %H:%M")
-                            
-                                                chart_cloro = alt.Chart(df_subsample).mark_line().encode(
-                                                    x=alt.X('Fecha_formateada:N', title='Fecha y hora', axis=alt.Axis(labelAngle=45)),
-                                                    y=alt.Y('Clorofila (µg/L):Q', title='Concentración (µg/L)'),
-                                                    tooltip=[
-                                                        alt.Tooltip('Fecha_formateada:N', title='Fecha y hora'),
-                                                        alt.Tooltip('Clorofila (µg/L):Q', title='Clorofila (µg/L)', format=".2f")
-                                                    ]
-                                                ).properties(
-                                                    title="Evolución de la concentración de clorofila (µg/L)"
-                                                )
-                            
-                                                st.altair_chart(chart_cloro, use_container_width=True)
-                                        else:
-                                            st.error("❌ El archivo no contiene las columnas necesarias: 'Fecha' y 'Clorofila (µg/L)'")
-                                    except Exception as e:
-                                        st.error(f"❌ Error al cargar el archivo de clorofila desde S3: {e}")
-
-                        
-                            if not df_time.empty:
-                                with st.expander("📉 Gráficos de valores por punto de interés", expanded=False):
-                                    df_time["Fecha_dt"] = pd.to_datetime(df_time["Date"], errors='coerce')
-                                
-                                    for point in df_time["Point"].unique():
-                                        if point != "Media_Embalse":
-                                            df_point = df_time[df_time["Point"] == point]
-                                            df_melted = df_point.melt(id_vars=["Point", "Fecha_dt"],
-                                                                      value_vars=selected_indices,
-                                                                      var_name="Índice", value_name="Valor")
-                                
-                                            chart = alt.Chart(df_melted).mark_line(point=True).encode(
-                                                x=alt.X('Fecha_dt:T', title='Fecha y hora',
-                                                        axis=alt.Axis(format="%d-%b %H:%M", labelAngle=45)),
-                                                y=alt.Y('Valor:Q', title='Concentración (µg/L)'),
-                                                color=alt.Color('Índice:N', title='Índice'),
-                                                tooltip=[
-                                                    alt.Tooltip('Fecha_dt:T', title='Fecha y hora', format="%d-%m-%Y %H:%M"),
-                                                    'Índice:N', 'Valor:Q'
-                                                ]
-                                            ).properties(
-                                                title=f"Valores de índices en {point}"
-                                            )
-                                
-                                            st.altair_chart(chart, use_container_width=True)
-
+        # Gráficos de distribución por clases (requiere image_list en session_state)
+        if "image_list" in st.session_state and st.session_state["image_list"]:
+            with st.expander("📊 Distribución diaria por clases del índice en el embalse", expanded=False):
                         with tab4:
                             st.subheader("Tablas de Índices Calculados")
                         
@@ -2406,19 +2010,3 @@ with tab5:
                                         if not df_medias.empty:
                                             st.markdown("### 💧 Datos de medias del embalse")
                                             st.dataframe(df_medias.reset_index(drop=True))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
