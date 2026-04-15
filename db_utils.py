@@ -1,6 +1,9 @@
 # db_utils.py
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote_plus
+import uuid
+import json
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -190,3 +193,128 @@ def default_widget_value(sql_type: str) -> str:
     if "date" in t or "time" in t:
         return "date"
     return "text"
+
+
+# =========================
+# Jobs asíncronos
+# =========================
+# Estados posibles: "pending" | "running" | "done" | "error"
+
+_JOBS_TABLE = "hiblooms_jobs"
+
+
+def create_jobs_table(engine: Engine) -> None:
+    """
+    Crea la tabla de jobs si no existe.
+    Llamar una vez al arrancar la API (api/main.py startup).
+    """
+    sql = f"""
+        CREATE TABLE IF NOT EXISTS {_JOBS_TABLE} (
+            id            TEXT        PRIMARY KEY,
+            workflow      TEXT        NOT NULL,
+            state         TEXT        NOT NULL DEFAULT 'pending',
+            progress      INTEGER     NOT NULL DEFAULT 0,
+            step          TEXT        NOT NULL DEFAULT '',
+            config_json   TEXT        NOT NULL DEFAULT '{{}}',
+            results_json  TEXT        NOT NULL DEFAULT '{{}}',
+            error         TEXT        NOT NULL DEFAULT '',
+            created_at    TIMESTAMP   NOT NULL DEFAULT NOW(),
+            updated_at    TIMESTAMP   NOT NULL DEFAULT NOW()
+        );
+    """
+    with engine.begin() as con:
+        con.execute(text(sql))
+
+
+def create_job(engine: Engine, workflow: str, config: Dict[str, Any]) -> str:
+    """
+    Inserta un nuevo job en estado 'pending' y devuelve su id.
+    """
+    job_id = str(uuid.uuid4())
+    sql = text(f"""
+        INSERT INTO {_JOBS_TABLE}
+            (id, workflow, state, progress, step, config_json, results_json, error, created_at, updated_at)
+        VALUES
+            (:id, :workflow, 'pending', 0, '', :config_json, '{{}}', '', NOW(), NOW())
+    """)
+    with engine.begin() as con:
+        con.execute(sql, {
+            "id":          job_id,
+            "workflow":    workflow,
+            "config_json": json.dumps(config, default=str),
+        })
+    return job_id
+
+
+def get_job(engine: Engine, job_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Devuelve el registro completo de un job o None si no existe.
+    """
+    sql = text(f"SELECT * FROM {_JOBS_TABLE} WHERE id = :id")
+    with engine.connect() as con:
+        row = con.execute(sql, {"id": job_id}).mappings().first()
+    if row is None:
+        return None
+    d = dict(row)
+    # Deserializar JSON almacenado
+    d["config"]  = json.loads(d.pop("config_json",  "{}"))
+    d["results"] = json.loads(d.pop("results_json", "{}"))
+    return d
+
+
+def update_job_progress(engine: Engine, job_id: str, step: str, progress: int) -> None:
+    """
+    Actualiza el paso y porcentaje de progreso (0-100) de un job en ejecución.
+    Llamar desde el worker cada vez que avanza una etapa.
+    """
+    sql = text(f"""
+        UPDATE {_JOBS_TABLE}
+        SET state = 'running', step = :step, progress = :progress, updated_at = NOW()
+        WHERE id = :id
+    """)
+    with engine.begin() as con:
+        con.execute(sql, {"id": job_id, "step": step, "progress": progress})
+
+
+def complete_job(engine: Engine, job_id: str, results: Dict[str, Any]) -> None:
+    """
+    Marca el job como 'done' y guarda los resultados.
+    """
+    sql = text(f"""
+        UPDATE {_JOBS_TABLE}
+        SET state = 'done', progress = 100, step = 'Completed',
+            results_json = :results_json, updated_at = NOW()
+        WHERE id = :id
+    """)
+    with engine.begin() as con:
+        con.execute(sql, {
+            "id":           job_id,
+            "results_json": json.dumps(results, default=str),
+        })
+
+
+def fail_job(engine: Engine, job_id: str, error: str) -> None:
+    """
+    Marca el job como 'error' y guarda el mensaje de error.
+    """
+    sql = text(f"""
+        UPDATE {_JOBS_TABLE}
+        SET state = 'error', error = :error, updated_at = NOW()
+        WHERE id = :id
+    """)
+    with engine.begin() as con:
+        con.execute(sql, {"id": job_id, "error": error})
+
+
+def get_engine_from_config(config: Dict[str, Any]) -> Engine:
+    """
+    Versión de get_engine() que no depende de st.secrets.
+    Útil para el worker (api/worker.py) que corre fuera de Streamlit.
+    Espera un dict con keys: host, port, dbname, user, password.
+    """
+    uri = (
+        "postgresql+psycopg2://"
+        f"{quote_plus(config['user'])}:{quote_plus(config['password'])}"
+        f"@{config['host']}:{config.get('port', 5432)}/{config['dbname']}"
+    )
+    return create_engine(uri, pool_pre_ping=True)
