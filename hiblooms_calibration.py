@@ -821,7 +821,7 @@ def render_calibration_tab(
             _resp = _cal_requests.post(
                 f"{_CAL_API_URL}/jobs/submit",
                 json=_run_config,
-                timeout=10,
+                timeout=60,
             )
             if _resp.ok:
                 _job_id = _resp.json()["job_id"]
