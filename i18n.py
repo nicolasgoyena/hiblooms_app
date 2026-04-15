@@ -1,0 +1,148 @@
+# i18n.py — Traducciones ES/EN para HIBLOOMS
+
+LANGS = ["es", "en"]
+
+STR = {
+    "es": {
+        "meta.title": "HIBLOOMS – Visor de embalses",
+        "ui.language": "Idioma",
+        "tabs.intro": "Introducción",
+        "tabs.map": "Visualización",
+        "tabs.tables": "Tablas",
+        "tabs.quick": "Modo rápido",
+        "hero.l1": "Visor de indicadores de la calidad del agua en embalses españoles:",
+        "hero.l2": "Proyecto HIBLOOMS",
+
+        "upload.shp.h": "🔄 Cargar shapefile propio con todos los embalses de interés (opcional)",
+        "upload.shp.i": "📄 Asegúrate de que el shapefile contiene una columna llamada **'NOMBRE'** con el nombre de cada embalse.",
+        "upload.shp.zip": "Sube un archivo ZIP con tu shapefile de embalses",
+
+        "map.title": "Mapa de Embalses",
+        "reservoir.pick.h": "Selección de Embalse",
+        "reservoir.pick.label": "Selecciona un embalse:",
+        "poi.h": "Puntos de interés",
+        "poi.ok": "Puntos de interés por defecto disponibles para este embalse.",
+        "poi.none": "Este embalse no tiene puntos de interés por defecto. Puedes subir un archivo CSV con columnas llamadas exactamente: 'nombre', 'latitud' y 'longitud'.",
+        "poi.csv": "Sube un archivo CSV con los puntos de interés",
+        "poi.active": "**Puntos de interés activos:**",
+
+        "cloud.h": "Selecciona un porcentaje máximo de nubosidad:",
+        "cloud.label": "Es recomendable elegir hasta el 60%. Si quieres ver más imágenes, aumenta la tolerancia:",
+        "cloud.100": "🔁 Has seleccionado un 100 % de nubosidad: se mostrarán todas las imágenes del periodo. Se estimará igualmente la nubosidad de cada imagen.",
+
+        "dates.h": "Selecciona el intervalo de fechas:",
+        "dates.label": "Rango de fechas:",
+
+        "idx.h": "Selecciona los índices a visualizar:",
+        "idx.label": "Selecciona uno o varios índices para visualizar y analizar:",
+        "idx.help": "ℹ️ ¿Qué significa cada índice?",
+        "btn.compute": "Calcular y mostrar resultados",
+
+        "spinner.img": "🕒 Analizando imagen del",
+        "spinner.proc": "Calculando fechas disponibles...",
+        "warn.no_imgs": "⚠️ No se han encontrado imágenes dentro del rango y porcentaje de nubosidad seleccionados.",
+
+        "avail.h": "📅 Fechas disponibles dentro del rango seleccionado:",
+        "legend.exp": "🗺️ Leyenda de índices y capas",
+        "cloud.exp": "☁️ Nubosidad estimada por imagen",
+        "mean.exp": "📊 Evolución de la media diaria de concentraciones del embalse",
+        "dist.exp": "📊 Distribución diaria por clases del índice en el embalse",
+        "legend.title": "📌 Leyenda de Índices y Capas",
+
+        "map.rgb": "RGB",
+        "map.scl": "SCL - Clasificación de Escena",
+        "map.cloudprob": "Probabilidad de Nubes (MSK_CLDPRB)",
+        "map.poi": "Puntos de Interés",
+        "map.index.for": "📅 Mapa de Índices para",
+        "mean.index": "🧪 Índice",
+        "axis.conc": "Concentración (μg/L)",
+        "axis.idx": "Valor del índice",
+
+        "col.date": "Fecha",
+        "col.time": "Hora",
+        "col.cloud": "Nubosidad aproximada (%)",
+
+        "scl.1": "Píxeles saturados/defectuosos",
+        "scl.2": "Área oscura",
+        "scl.3": "Sombras de nube",
+        "scl.4": "Vegetación",
+        "scl.5": "Suelo desnudo",
+        "scl.6": "Agua",
+        "scl.7": "Prob. baja de nubes / No clasificada",
+        "scl.8": "Prob. media de nubes",
+        "scl.9": "Prob. alta de nubes",
+        "scl.10": "Cirro",
+        "scl.11": "Nieve o hielo",
+    },
+    "en": {
+        "meta.title": "HIBLOOMS – Reservoir viewer",
+        "ui.language": "Language",
+        "tabs.intro": "Introduction",
+        "tabs.map": "Map",
+        "tabs.tables": "Tables",
+        "tabs.quick": "Quick mode",
+        "hero.l1": "Water-quality indicator viewer for Spanish reservoirs:",
+        "hero.l2": "HIBLOOMS Project",
+
+        "upload.shp.h": "🔄 Load your own shapefile with all reservoirs of interest (optional)",
+        "upload.shp.i": "📄 Make sure the shapefile contains a **'NOMBRE'** column with each reservoir name.",
+        "upload.shp.zip": "Upload a ZIP file with your reservoir shapefile",
+
+        "map.title": "Reservoir map",
+        "reservoir.pick.h": "Reservoir selection",
+        "reservoir.pick.label": "Select a reservoir:",
+        "poi.h": "Points of interest",
+        "poi.ok": "Default points of interest are available for this reservoir.",
+        "poi.none": "No default POIs for this reservoir. You can upload a CSV with columns exactly named: 'nombre', 'latitud', 'longitud'.",
+        "poi.csv": "Upload a CSV with points of interest",
+        "poi.active": "**Active points of interest:**",
+
+        "cloud.h": "Pick a maximum cloud percentage:",
+        "cloud.label": "Values up to 60% are recommended. Increase tolerance to see more images:",
+        "cloud.100": "🔁 You selected 100% clouds: all images in the period will be included. We still estimate cloud probability per image.",
+
+        "dates.h": "Select the date range:",
+        "dates.label": "Date range:",
+
+        "idx.h": "Pick the indices to display:",
+        "idx.label": "Select one or more indices for visualization and analysis:",
+        "idx.help": "ℹ️ What does each index mean?",
+        "btn.compute": "Compute & show results",
+
+        "spinner.img": "🕒 Analyzing image from",
+        "spinner.proc": "Calculating available dates...",
+        "warn.no_imgs": "⚠️ No images found within the selected range and cloud threshold.",
+
+        "avail.h": "📅 Available dates in the selected range:",
+        "legend.exp": "🗺️ Legend for indices and layers",
+        "cloud.exp": "☁️ Estimated cloud per image",
+        "mean.exp": "📊 Daily mean evolution for the reservoir",
+        "dist.exp": "📊 Daily per-class distribution in the reservoir",
+        "legend.title": "📌 Indices & Layers Legend",
+
+        "map.rgb": "RGB",
+        "map.scl": "SCL - Scene Classification",
+        "map.cloudprob": "Cloud probability (MSK_CLDPRB)",
+        "map.poi": "Points of Interest",
+        "map.index.for": "📅 Index maps for",
+        "mean.index": "🧪 Index",
+        "axis.conc": "Concentration (μg/L)",
+        "axis.idx": "Index value",
+
+        "col.date": "Date",
+        "col.time": "Time",
+        "col.cloud": "Approx. cloud (%)",
+
+        "scl.1": "Saturated/defective pixels",
+        "scl.2": "Dark area pixels",
+        "scl.3": "Cloud shadows",
+        "scl.4": "Vegetation",
+        "scl.5": "Bare soil",
+        "scl.6": "Water",
+        "scl.7": "Low cloud probability / Unclassified",
+        "scl.8": "Medium cloud probability",
+        "scl.9": "High cloud probability",
+        "scl.10": "Cirrus",
+        "scl.11": "Snow or ice",
+    },
+}
