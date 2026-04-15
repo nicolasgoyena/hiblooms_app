@@ -209,9 +209,15 @@ def run_visualization_job(
             update(job_id, f"Procesando imagen {i+1}/{n}: {day}…", pct)
 
             try:
-                scaled_image, indices_image, image_date = process_sentinel2(
+                scaled_image, indices_image, image_date, _cloud_pct, _cov_pct = process_sentinel2(
                     aoi, day, max_cloud_pct, selected_indices
                 )
+                if _cloud_pct is not None:
+                    used_cloud_results.append({
+                        "Fecha": day,
+                        "Hora": image_date[11:16] if image_date else "00:00",
+                        "Nubosidad aproximada (%)": round(_cloud_pct, 2),
+                    })
             except Exception as e:
                 log.warning(f"[{job_id}] Error en {day}: {e}")
                 continue
