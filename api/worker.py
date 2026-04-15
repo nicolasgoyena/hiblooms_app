@@ -260,9 +260,9 @@ def run_visualization_job(
                     water_mask = scl.eq(6).Or(scl.eq(2))
                 else:
                     water_mask = scl.eq(6)
-                # indices_image ya tiene B4/B3/B2 escaladas a reflectancia (0-1)
-                # gracias a _build_indices_image en hiblooms_core
-                rgb_clipped = indices_image.select(["B4", "B3", "B2"]).clip(aoi).updateMask(water_mask)
+                # scaled_image ya viene clippeada al AOI y escalada a reflectancia (0-1)
+                # gracias al fix en hiblooms_core.process_sentinel2
+                rgb_clipped = scaled_image.select(["B4", "B3", "B2"]).updateMask(water_mask)
                 layers["RGB"] = rgb_clipped.visualize(
                     bands=["B4", "B3", "B2"], min=0.02, max=0.2, gamma=1.4
                 ).getMapId()["tile_fetcher"].url_format
