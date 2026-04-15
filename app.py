@@ -1637,27 +1637,48 @@ with tab3:
         # Timeline de fechas disponibles
         if _available_dates:
             st.subheader(t("avail.h"))
-            df_available = pd.DataFrame(_available_dates, columns=["Fecha"])
+            # Deduplicar por fecha (sin hora) y ordenar
+            _fechas_unicas = sorted(set(
+                pd.to_datetime(f).strftime("%Y-%m-%d") for f in _available_dates
+            ))
+            df_available = pd.DataFrame(_fechas_unicas, columns=["Fecha"])
             df_available["Fecha"] = pd.to_datetime(df_available["Fecha"])
-            # Eliminar duplicados — quedarse solo con la fecha sin hora
-            df_available["Fecha"] = df_available["Fecha"].dt.normalize()
-            df_available = df_available.drop_duplicates(subset=["Fecha"])
-            df_available["Fecha_str"] = df_available["Fecha"].dt.strftime("%d-%b")
+            df_available["Fecha_str"] = df_available["Fecha"].dt.strftime("%d %b")
             df_available["y_base"] = 0
-            timeline_chart = alt.Chart(df_available).mark_tick(thickness=2, size=20).encode(
-                x=alt.X("Fecha:T", title=None, axis=alt.Axis(labelAngle=0, format="%d-%b")),
+
+            # Puntos en la línea de tiempo
+            points = alt.Chart(df_available).mark_point(
+                size=120, filled=True, opacity=0.85
+            ).encode(
+                x=alt.X("Fecha:T", title=None, axis=alt.Axis(
+                    labelAngle=0, format="%d %b", tickCount=len(_fechas_unicas)
+                )),
                 y=alt.Y("y_base:Q", axis=None),
-                tooltip=alt.Tooltip("Fecha:T", title="Fecha"),
-            ).properties(height=100, width="container")
-            text_layer = alt.Chart(df_available).mark_text(
-                align="center", baseline="bottom", dy=-15, fontSize=11
+                tooltip=[alt.Tooltip("Fecha:T", title="Fecha", format="%d-%m-%Y")],
+                color=alt.value("#5297d2"),
+            )
+            # Etiquetas encima de cada punto
+            labels = alt.Chart(df_available).mark_text(
+                align="center", baseline="bottom", dy=-14, fontSize=12, fontWeight=500
             ).encode(
                 x="Fecha:T",
-                y=alt.value(30),
+                y=alt.value(50),
                 text="Fecha_str:N",
+                color=alt.value("#475a23"),
+            )
+            # Línea base que conecta los puntos
+            line = alt.Chart(df_available).mark_line(
+                strokeWidth=1.5, opacity=0.3
+            ).encode(
+                x="Fecha:T",
+                y="y_base:Q",
+                color=alt.value("#5297d2"),
             )
             st.altair_chart(
-                (timeline_chart + text_layer).configure_axis(labelFontSize=12, tickSize=5),
+                (line + points + labels)
+                .properties(height=100, width="container")
+                .configure_axis(labelFontSize=12)
+                .configure_view(strokeWidth=0),
                 use_container_width=True,
             )
 
