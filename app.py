@@ -1582,47 +1582,48 @@ with tab3:
                             st.error(f"❌ No se pudo conectar con la API de jobs: {_e}")
 
     # ── PANEL DE ESTADO / POLLING ────────────────────────────────────────────────
-    # Se muestra siempre que haya un job en curso (sin bloquear la UI)
+    # Usando st.fragment para que solo se recargue esta sección, no toda la página
     if "viz_job_id" in st.session_state and "viz_job_results" not in st.session_state:
-        if _AUTOREFRESH_AVAILABLE:
-            _st_autorefresh(interval=5000, key="viz_job_poller")
 
-        _job_id = st.session_state["viz_job_id"]
-        try:
-            _status = _requests.get(
-                f"{_API_URL}/jobs/{_job_id}/status", timeout=5
-            ).json()
-        except Exception:
-            _status = {"state": "unknown"}
+        @st.fragment(run_every=5)
+        def _polling_fragment():
+            _job_id = st.session_state.get("viz_job_id")
+            if not _job_id:
+                return
+            try:
+                _status = _requests.get(
+                    f"{_API_URL}/jobs/{_job_id}/status", timeout=5
+                ).json()
+            except Exception:
+                _status = {"state": "unknown"}
 
-        _state = _status.get("state", "unknown")
+            _state = _status.get("state", "unknown")
 
-        if _state == "running":
-            _pct  = _status.get("progress", 0)
-            _step = _status.get("step", "Procesando…")
-            st.progress(_pct / 100, text=f"⏳ {_step}")
-            if not _AUTOREFRESH_AVAILABLE:
-                st.info("Recarga la página para actualizar el estado del cálculo.")
+            if _state == "running":
+                _pct  = _status.get("progress", 0)
+                _step = _status.get("step", "Procesando…")
+                st.progress(_pct / 100, text=f"⏳ {_step}")
 
-        elif _state == "done":
-            st.session_state["viz_job_results"] = _status.get("results", {})
-            # Reconstruir session_state que usaban los widgets de resultados
-            _res = st.session_state["viz_job_results"]
-            st.session_state["data_time"]          = _res.get("data_time", [])
-            st.session_state["cloud_results"]      = _res.get("cloud_results", [])
-            st.session_state["used_cloud_results"] = _res.get("used_cloud_results", [])
-            st.session_state["available_dates"]    = _res.get("available_dates", [])
-            st.session_state["selected_indices"]   = _res.get("selected_indices", [])
-            st.session_state["urls_exportacion"]   = _res.get("urls_exportacion", [])
-            del st.session_state["viz_job_id"]
-            st.rerun()
+            elif _state == "done":
+                _res = _status.get("results", {})
+                st.session_state["viz_job_results"] = _res
+                st.session_state["data_time"]          = _res.get("data_time", [])
+                st.session_state["cloud_results"]      = _res.get("cloud_results", [])
+                st.session_state["used_cloud_results"] = _res.get("used_cloud_results", [])
+                st.session_state["available_dates"]    = _res.get("available_dates", [])
+                st.session_state["selected_indices"]   = _res.get("selected_indices", [])
+                st.session_state["urls_exportacion"]   = _res.get("urls_exportacion", [])
+                del st.session_state["viz_job_id"]
+                st.rerun()
 
-        elif _state == "error":
-            st.error(f"❌ El workflow falló: {_status.get('error', 'error desconocido')}")
-            del st.session_state["viz_job_id"]
+            elif _state == "error":
+                st.error(f"❌ El workflow falló: {_status.get('error', 'error desconocido')}")
+                del st.session_state["viz_job_id"]
 
-        else:
-            st.info("⏳ Esperando respuesta del servidor de jobs…")
+            else:
+                st.info("⏳ Esperando respuesta del servidor de jobs…")
+
+        _polling_fragment()
 
     # ── RENDERIZADO DE RESULTADOS ────────────────────────────────────────────────
     # Se activa cuando los resultados ya están en session_state
