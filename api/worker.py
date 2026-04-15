@@ -251,8 +251,18 @@ def run_visualization_job(
                 image_date_fmt = _dt.strptime(image_date, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                 layers: Dict[str, str] = {}
 
-                layers["RGB"] = scaled_image.visualize(
-                    bands=["B4", "B3", "B2"], min=0, max=0.3, gamma=1.4
+                # Recortar al AOI y enmascarar solo píxeles de agua
+                # En 2018 el agua puede tener SCL==2 además de SCL==6
+                from datetime import datetime as _dt2
+                _year = _dt2.strptime(image_date, "%Y-%m-%d %H:%M:%S").year
+                scl = indices_image.select("SCL")
+                if _year == 2018:
+                    water_mask = scl.eq(6).Or(scl.eq(2))
+                else:
+                    water_mask = scl.eq(6)
+                rgb_clipped = scaled_image.clip(aoi).updateMask(water_mask)
+                layers["RGB"] = rgb_clipped.visualize(
+                    bands=["B4", "B3", "B2"], min=0.02, max=0.2, gamma=1.4
                 ).getMapId()["tile_fetcher"].url_format
 
                 scl_colors = [
@@ -269,7 +279,8 @@ def run_visualization_job(
 
                 for idx in selected_indices:
                     mn, mx = vis_ranges.get(idx, (-0.1, 0.4))
-                    layers[idx] = indices_image.select(idx).visualize(
+                    idx_layer = indices_image.select(idx).clip(aoi).updateMask(water_mask)
+                    layers[idx] = idx_layer.visualize(
                         min=mn, max=mx, palette=index_palettes.get(idx, ["blue","green","yellow","red"])
                     ).getMapId()["tile_fetcher"].url_format
 
