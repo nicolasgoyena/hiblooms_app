@@ -407,8 +407,13 @@ def process_sentinel2(
     t0 = best.get("system:time_start").getInfo()
     image_iso = datetime.utcfromtimestamp(t0 / 1000).strftime("%Y-%m-%d %H:%M:%S")
 
-    # Construir índices
-    scaled = best
+    # Escalar bandas ópticas de DN (0-10000) a reflectancia (0-1)
+    # igual que hacía app.py originalmente
+    bandas_requeridas = ["B2", "B3", "B4", "B5", "B6", "B8A"]
+    clipped = best.clip(aoi)
+    optical = clipped.select(bandas_requeridas).divide(10000)
+    scaled = clipped.addBands(optical, overwrite=True)
+
     indices_image = _build_indices_image(scaled, aoi, selected_indices)
 
     return scaled, indices_image, image_iso, best_cloud, best_cov
