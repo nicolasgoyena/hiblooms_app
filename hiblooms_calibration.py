@@ -767,155 +767,191 @@ def render_calibration_tab(
         st.warning("Select at least one candidate model.")
         return
 
+    # ── IMPORTS ASÍNCRONOS (solo necesarios aquí) ────────────────────────────
+    import requests as _cal_requests
+    try:
+        from streamlit_autorefresh import st_autorefresh as _cal_autorefresh
+        _CAL_AUTOREFRESH = True
+    except ImportError:
+        _CAL_AUTOREFRESH = False
+
+    _CAL_API_URL = st.secrets.get("api_url", "http://localhost:8000")
+
+    # ── BOTÓN: solo construye el payload y envía a la API ────────────────────
     if st.button("Run calibration", key="cal_run"):
         try:
-            progress_bar = st.progress(0)
-            progress_text = st.empty()
-
-            with st.status("Running calibration workflow...", expanded=True) as status:
-                total_steps = 5
-                current_step = 0
-
-                progress_text.info("Preparing in situ data...")
-                insitu_clean, priority_dates = prepare_insitu(df_raw, target_variable, start_hour, end_hour)
-                current_step += 1
-                progress_bar.progress(current_step / total_steps)
-                st.write(f"✔ In situ data prepared: {len(insitu_clean)} rows")
-                st.write(f"✔ Unique in situ dates: {len(priority_dates)}")
-
-                progress_text.info("Loading reservoir geometry...")
-                gdf = load_reservoir_shapefile(reservoir_name)
-                aoi = gdf_to_ee_geometry(gdf)
-                current_step += 1
-                progress_bar.progress(current_step / total_steps)
-                st.write("✔ Reservoir geometry ready")
-
-                min_insitu_date = pd.to_datetime(insitu_clean["date"]).min()
-                max_insitu_date = pd.to_datetime(insitu_clean["date"]).max()
-                start_date = min_insitu_date.strftime("%Y-%m-%d")
-                end_date = max_insitu_date.strftime("%Y-%m-%d")
-
-                st.write(f"📅 Satellite search range: {start_date} → {end_date}")
-
-                progress_text.info("Querying Sentinel-2 and computing predictors...")
-                sat_internal_bar = st.progress(0)
-                sat_internal_text = st.empty()
-
-                sat_df = compute_satellite_features(
-                    aoi=aoi,
-                    start_date=start_date,
-                    end_date=end_date,
-                    max_cloud_percentage=max_cloud,
-                    min_coverage_percentage=min_coverage,
-                    scale_m=20,
-                    candidate_indices=predictor_set,
-                    priority_dates=priority_dates,
-                    progress_bar=sat_internal_bar,
-                    progress_text=sat_internal_text,
-                )
-                current_step += 1
-                progress_bar.progress(current_step / total_steps)
-                st.write(f"✔ Satellite rows extracted: {len(sat_df)}")
-                if not sat_df.empty and "valid_final" in sat_df.columns:
-                    st.write(f"✔ Satellite rows with valid_final = True: {int(sat_df['valid_final'].sum())}")
-
-                progress_text.info("Matching in situ data with satellite overpasses...")
-                insitu_daily = match_insitu_to_overpass(
-                    insitu_clean,
-                    sat_df,
-                    overpass_window_hours=overpass_window,
-                )
-                current_step += 1
-                progress_bar.progress(current_step / total_steps)
-                st.write(f"✔ Matched daily observations: {len(insitu_daily)}")
-
-                progress_text.info("Training calibration models...")
-                result = fit_calibration_model(
-                    insitu_daily_df=insitu_daily,
-                    sat_df=sat_df,
-                    target_variable=target_variable,
-                    predictor_set=predictor_set,
-                    candidate_models=selected_models,
-                    outlier_method=outlier_method,
-                    cv_scheme=cv_scheme,
-                    cv_folds=5,
-                    test_size=0.25,
-                    min_samples_required=min_samples_required,
-                )
-                current_step += 1
-                progress_bar.progress(current_step / total_steps)
-                st.write("✔ Model training completed")
-
-                progress_text.success("Calibration workflow completed.")
-                status.update(label="Calibration completed successfully", state="complete")
-
-            fig = build_diagnostics_figure(
-                result["predictions_df"],
-                f"Best model: {result['config']['best_model_name']}",
+            insitu_clean, priority_dates = prepare_insitu(
+                df_raw, target_variable, start_hour, end_hour
             )
-
-            st.session_state["user_calibration"] = result
-            st.session_state["user_calibration_ready"] = True
-            st.success("Calibration finished successfully.")
-
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Matched samples", result["config"]["n_samples_after_merge"])
-            c2.metric("Best model", result["config"]["best_model_name"])
-            c3.metric("CV R²", f"{result['config']['cv_r2_mean']:.3f}")
-
-            st.markdown("#### Best calibration summary")
-            st.json(result["config"], expanded=False)
-
-            st.markdown("#### Model comparison")
-            st.dataframe(result["metrics_df"], use_container_width=True)
-
-            st.markdown("#### Predictions")
-            st.dataframe(result["predictions_df"], use_container_width=True)
-
-            if not result["removed_outliers_df"].empty:
-                st.markdown("#### Removed outliers")
-                st.dataframe(result["removed_outliers_df"], use_container_width=True)
-
-            st.pyplot(fig, use_container_width=True)
-
-            downloads = _pack_download_bytes(result)
-            d1, d2, d3, d4, d5 = st.columns(5)
-            d1.download_button(
-                "Config JSON",
-                downloads["calibration_config.json"],
-                file_name="calibration_config.json",
-                mime="application/json",
-            )
-            d2.download_button(
-                "Metrics CSV",
-                downloads["calibration_metrics.csv"],
-                file_name="calibration_metrics.csv",
-                mime="text/csv",
-            )
-            d3.download_button(
-                "Predictions CSV",
-                downloads["calibration_predictions.csv"],
-                file_name="calibration_predictions.csv",
-                mime="text/csv",
-            )
-            d4.download_button(
-                "Outliers CSV",
-                downloads["calibration_removed_outliers.csv"],
-                file_name="calibration_removed_outliers.csv",
-                mime="text/csv",
-            )
-            d5.download_button(
-                "Model joblib",
-                downloads["best_model.joblib"],
-                file_name="best_model.joblib",
-                mime="application/octet-stream",
-            )
-
-            st.info(
-                "This integration adds the calibration workflow to the app and stores the fitted model in "
-                "session state. A full pixel-wise calibrated map would still require translating the selected "
-                "model to an Earth Engine raster expression, which is only straightforward for some model families."
-            )
-
         except Exception as e:
-            st.exception(e)
+            st.error(f"Error preparing in situ data: {e}")
+            return
+
+        if not priority_dates:
+            st.warning("No valid in situ dates found after filtering.")
+            return
+
+        gdf = load_reservoir_shapefile(reservoir_name)
+        if gdf is None:
+            st.error("Could not load reservoir shapefile.")
+            return
+
+        _run_config = {
+            "workflow": "calibration",
+            "reservoir": reservoir_name,
+            "aoi_geojson": gdf.to_crs(epsg=4326).to_json(),
+            "target_variable": target_variable,
+            "start_hour": int(start_hour),
+            "end_hour": int(end_hour),
+            "overpass_window": float(overpass_window),
+            "max_cloud": int(max_cloud),
+            "min_coverage": int(min_coverage),
+            "predictor_set": predictor_set,
+            "selected_models": selected_models,
+            "cv_scheme": cv_scheme,
+            "outlier_method": outlier_method,
+            "min_samples_required": int(min_samples_required),
+            # CSV en base64 para que el worker lo tenga disponible
+            "insitu_csv_b64": __import__("base64").b64encode(
+                csv_file.getvalue()
+            ).decode("utf-8"),
+        }
+
+        try:
+            _resp = _cal_requests.post(
+                f"{_CAL_API_URL}/jobs/submit",
+                json=_run_config,
+                timeout=10,
+            )
+            if _resp.ok:
+                _job_id = _resp.json()["job_id"]
+                st.session_state["cal_job_id"] = _job_id
+                st.session_state.pop("cal_job_results", None)
+                st.success(
+                    f"✅ Calibration job submitted (`{_job_id}`). "
+                    "Results will appear here when ready."
+                )
+            else:
+                st.error(f"❌ Error submitting job: {_resp.status_code} – {_resp.text}")
+        except Exception as e:
+            st.error(f"❌ Could not reach the jobs API: {e}")
+
+    # ── PANEL DE POLLING ─────────────────────────────────────────────────────
+    if "cal_job_id" in st.session_state and "cal_job_results" not in st.session_state:
+        if _CAL_AUTOREFRESH:
+            _cal_autorefresh(interval=5000, key="cal_job_poller")
+
+        _job_id = st.session_state["cal_job_id"]
+        try:
+            _status = _cal_requests.get(
+                f"{_CAL_API_URL}/jobs/{_job_id}/status", timeout=5
+            ).json()
+        except Exception:
+            _status = {"state": "unknown"}
+
+        _state = _status.get("state", "unknown")
+
+        if _state == "running":
+            _pct  = _status.get("progress", 0)
+            _step = _status.get("step", "Processing…")
+            st.progress(_pct / 100, text=f"⏳ {_step}")
+            if not _CAL_AUTOREFRESH:
+                st.info("Reload the page to update the calibration status.")
+
+        elif _state == "done":
+            st.session_state["cal_job_results"] = _status.get("results", {})
+            del st.session_state["cal_job_id"]
+            st.rerun()
+
+        elif _state == "error":
+            st.error(f"❌ Calibration failed: {_status.get('error', 'unknown error')}")
+            del st.session_state["cal_job_id"]
+
+        else:
+            st.info("⏳ Waiting for job server response…")
+
+    # ── RENDER DE RESULTADOS ─────────────────────────────────────────────────
+    # Se activa cuando los resultados ya están en session_state
+    if "cal_job_results" in st.session_state:
+        _res = st.session_state["cal_job_results"]
+        _config      = _res.get("config", {})
+        _metrics     = _res.get("metrics_df", [])
+        _predictions = _res.get("predictions_df", [])
+        _outliers    = _res.get("removed_outliers_df", [])
+        _diag_b64    = _res.get("diagnostics_png_b64", None)
+
+        st.success("Calibration finished successfully.")
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Matched samples", _config.get("n_samples_after_merge", "—"))
+        c2.metric("Best model",      _config.get("best_model_name", "—"))
+        c3.metric("CV R²",           f"{_config.get('cv_r2_mean', 0):.3f}")
+
+        st.markdown("#### Best calibration summary")
+        st.json(_config, expanded=False)
+
+        if _metrics:
+            st.markdown("#### Model comparison")
+            st.dataframe(pd.DataFrame(_metrics), use_container_width=True)
+
+        if _predictions:
+            st.markdown("#### Predictions")
+            st.dataframe(pd.DataFrame(_predictions), use_container_width=True)
+
+        if _outliers:
+            st.markdown("#### Removed outliers")
+            st.dataframe(pd.DataFrame(_outliers), use_container_width=True)
+
+        if _diag_b64:
+            import base64
+            from PIL import Image
+            import io as _io
+            _img_bytes = base64.b64decode(_diag_b64)
+            _img = Image.open(_io.BytesIO(_img_bytes))
+            st.image(_img, use_column_width=True)
+
+        # Botones de descarga — los artefactos los devuelve el worker como base64
+        _downloads = _res.get("download_files", {})
+        if _downloads:
+            d1, d2, d3, d4, d5 = st.columns(5)
+            if "calibration_config.json" in _downloads:
+                d1.download_button(
+                    "Config JSON",
+                    __import__("base64").b64decode(_downloads["calibration_config.json"]),
+                    file_name="calibration_config.json",
+                    mime="application/json",
+                )
+            if "calibration_metrics.csv" in _downloads:
+                d2.download_button(
+                    "Metrics CSV",
+                    __import__("base64").b64decode(_downloads["calibration_metrics.csv"]),
+                    file_name="calibration_metrics.csv",
+                    mime="text/csv",
+                )
+            if "calibration_predictions.csv" in _downloads:
+                d3.download_button(
+                    "Predictions CSV",
+                    __import__("base64").b64decode(_downloads["calibration_predictions.csv"]),
+                    file_name="calibration_predictions.csv",
+                    mime="text/csv",
+                )
+            if "calibration_removed_outliers.csv" in _downloads:
+                d4.download_button(
+                    "Outliers CSV",
+                    __import__("base64").b64decode(_downloads["calibration_removed_outliers.csv"]),
+                    file_name="calibration_removed_outliers.csv",
+                    mime="text/csv",
+                )
+            if "best_model.joblib" in _downloads:
+                d5.download_button(
+                    "Model joblib",
+                    __import__("base64").b64decode(_downloads["best_model.joblib"]),
+                    file_name="best_model.joblib",
+                    mime="application/octet-stream",
+                )
+
+        st.info(
+            "The calibration model is stored in session state. "
+            "A full pixel-wise calibrated map requires translating the selected "
+            "model to an Earth Engine raster expression."
+        )
