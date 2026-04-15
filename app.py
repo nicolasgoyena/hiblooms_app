@@ -1715,6 +1715,9 @@ with tab3:
                     else:
                         _map_center = [41.0, -1.5]
                     _map_indices = geemap.Map(center=_map_center, zoom=13)
+                    # Restringir la vista a los bounds del embalse
+                    _bounds = _gdf_4326.total_bounds  # (minx, miny, maxx, maxy)
+                    _map_indices.fit_bounds([[_bounds[1], _bounds[0]], [_bounds[3], _bounds[2]]])
                     for _lname, _url in _entry.get("layers", {}).items():
                         folium.raster_layers.TileLayer(
                             tiles=_url,
