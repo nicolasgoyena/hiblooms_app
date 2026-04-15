@@ -1642,32 +1642,14 @@ with tab3:
                 pd.to_datetime(f).strftime("%Y-%m-%d") for f in _available_dates
             ))
 
-            # Renderizar como pills HTML — sin dependencia de Altair
-            _pills_html = """
-            <div style="display:flex; flex-wrap:wrap; gap:10px; padding:12px 0;">
-            """
-            for _f in _fechas_unicas:
-                _dt = pd.to_datetime(_f)
-                _dia = _dt.strftime("%d")
-                _mes = _dt.strftime("%b")
-                _anyo = _dt.strftime("%Y")
-                _pills_html += f"""
-                <div style="
-                    background-color: #5297d2;
-                    color: white;
-                    border-radius: 20px;
-                    padding: 6px 16px;
-                    font-family: Playfair Display, serif;
-                    font-size: 14px;
-                    font-weight: 500;
-                    white-space: nowrap;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-                ">
-                    📅 {_dia} {_mes} {_anyo}
-                </div>
-                """
-            _pills_html += "</div>"
-            st.markdown(_pills_html, unsafe_allow_html=True)
+            # Renderizar como pills HTML
+            _style = "background:#5297d2;color:white;border-radius:20px;padding:6px 16px;font-size:14px;font-weight:500;white-space:nowrap;display:inline-block;"
+            _pills = "".join(
+                "<span style='" + _style + "'>📅 " + pd.to_datetime(_f).strftime("%d %b %Y") + "</span>"
+                for _f in _fechas_unicas
+            )
+            _wrap = "<div style='display:flex;flex-wrap:wrap;gap:10px;padding:12px 0;'>" + _pills + "</div>"
+            st.markdown(_wrap, unsafe_allow_html=True)
 
         with row2[1]:
             # Leyenda de índices y capas
