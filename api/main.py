@@ -1,32 +1,21 @@
 # api/main.py
 #
-# API de jobs asíncronos para HIBLOOMS.
+# API de jobs asíncronos para HIBLOOMS — estado en memoria (sin base de datos).
 # Arrancar con:
 #   uvicorn api.main:app --host 0.0.0.0 --port 8000
 #
-# Requiere en variables de entorno (o .env):
-#   POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DBNAME, POSTGRES_USER, POSTGRES_PASSWORD
+# La variable de entorno GEE_SERVICE_ACCOUNT_JSON debe contener el JSON
+# de la cuenta de servicio de Google Earth Engine (el mismo que en secrets.toml).
 
 from __future__ import annotations
 
-import os
 import logging
-from contextlib import asynccontextmanager
+import uuid
 from typing import Any, Dict
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
-from db_utils import (
-    create_jobs_table,
-    create_job,
-    get_job,
-    update_job_progress,
-    complete_job,
-    fail_job,
-    get_engine_from_config,
-)
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -35,40 +24,30 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Configuración de base de datos desde variables de entorno
+# Estado en memoria
+# Estructura de cada job:
+#   {
+#     "job_id":   str,
+#     "workflow": str,
+#     "state":    "pending" | "running" | "done" | "error",
+#     "progress": int (0-100),
+#     "step":     str,
+#     "error":    str,
+#     "results":  dict,
+#     "config":   dict,
+#   }
 # ---------------------------------------------------------------------------
-def _db_config() -> Dict[str, Any]:
-    return {
-        "host":     os.environ["POSTGRES_HOST"],
-        "port":     int(os.environ.get("POSTGRES_PORT", 5432)),
-        "dbname":   os.environ["POSTGRES_DBNAME"],
-        "user":     os.environ["POSTGRES_USER"],
-        "password": os.environ["POSTGRES_PASSWORD"],
-    }
-
-
-# ---------------------------------------------------------------------------
-# Startup: crear tabla si no existe
-# ---------------------------------------------------------------------------
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    try:
-        engine = get_engine_from_config(_db_config())
-        create_jobs_table(engine)
-        log.info("Jobs table ready.")
-    except Exception as e:
-        log.error(f"Could not initialise jobs table: {e}")
-    yield
+_JOBS: Dict[str, Dict[str, Any]] = {}
 
 
 # ---------------------------------------------------------------------------
 # App FastAPI
 # ---------------------------------------------------------------------------
-app = FastAPI(title="HIBLOOMS Jobs API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="HIBLOOMS Jobs API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # En producción, restringir al dominio de Streamlit
+    allow_origins=["*"],   # En producción restringir al dominio de Streamlit
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -78,13 +57,49 @@ app.add_middleware(
 # Modelos Pydantic
 # ---------------------------------------------------------------------------
 class JobSubmitRequest(BaseModel):
-    workflow: str                   # "visualization" | "calibration"
-    config:   Dict[str, Any] = {}   # payload completo desde la app
+    workflow: str                  # "visualization" | "calibration"
+    model_config = {"extra": "allow"}
+
+    def full_config(self) -> Dict[str, Any]:
+        return self.model_dump()
 
 
 class JobProgressUpdate(BaseModel):
     step:     str
-    progress: int                   # 0-100
+    progress: int   # 0-100
+
+
+# ---------------------------------------------------------------------------
+# Helpers internos
+# ---------------------------------------------------------------------------
+def _new_job(workflow: str, config: Dict[str, Any]) -> str:
+    job_id = str(uuid.uuid4())
+    _JOBS[job_id] = {
+        "job_id":   job_id,
+        "workflow": workflow,
+        "state":    "pending",
+        "progress": 0,
+        "step":     "",
+        "error":    "",
+        "results":  {},
+        "config":   config,
+    }
+    return job_id
+
+
+def _update_progress(job_id: str, step: str, progress: int) -> None:
+    if job_id in _JOBS:
+        _JOBS[job_id].update({"state": "running", "step": step, "progress": progress})
+
+
+def _complete(job_id: str, results: Dict[str, Any]) -> None:
+    if job_id in _JOBS:
+        _JOBS[job_id].update({"state": "done", "progress": 100, "step": "Completed", "results": results})
+
+
+def _fail(job_id: str, error: str) -> None:
+    if job_id in _JOBS:
+        _JOBS[job_id].update({"state": "error", "error": error})
 
 
 # ---------------------------------------------------------------------------
@@ -94,21 +109,23 @@ class JobProgressUpdate(BaseModel):
 @app.post("/jobs/submit", status_code=202)
 async def submit_job(body: JobSubmitRequest, background_tasks: BackgroundTasks):
     """
-    Recibe la configuración desde la app Streamlit, crea el job en la DB
+    Recibe la configuración desde la app Streamlit, crea el job en memoria
     y lo lanza en background. Devuelve el job_id inmediatamente.
     """
-    if body.workflow not in ("visualization", "calibration"):
-        raise HTTPException(status_code=400, detail=f"Unknown workflow: {body.workflow}")
+    workflow = body.workflow
+    if workflow not in ("visualization", "calibration"):
+        raise HTTPException(status_code=400, detail=f"Unknown workflow: {workflow}")
 
-    engine = get_engine_from_config(_db_config())
+    config = body.full_config()
+    job_id = _new_job(workflow, config)
+    log.info(f"Job created: {job_id} ({workflow})")
 
-    # Combinar workflow + config en un único dict para almacenar
-    full_config = {"workflow": body.workflow, **body.config}
-    job_id = create_job(engine, body.workflow, full_config)
-    log.info(f"Job created: {job_id} ({body.workflow})")
-
-    # Lanzar el worker en background (no bloquea la respuesta HTTP)
-    background_tasks.add_task(_run_job, job_id, body.workflow, full_config)
+    if workflow == "visualization":
+        from api.worker import run_visualization_job
+        background_tasks.add_task(run_visualization_job, job_id, config, _update_progress, _complete, _fail)
+    else:
+        from api.worker import run_calibration_job
+        background_tasks.add_task(run_calibration_job, job_id, config, _update_progress, _complete, _fail)
 
     return {"job_id": job_id, "state": "pending"}
 
@@ -116,12 +133,10 @@ async def submit_job(body: JobSubmitRequest, background_tasks: BackgroundTasks):
 @app.get("/jobs/{job_id}/status")
 async def get_job_status(job_id: str):
     """
-    Devuelve el estado actual del job: state, progress, step y results si done.
+    Devuelve el estado actual del job.
     Llamado por la app cada 5 s mediante st_autorefresh.
     """
-    engine = get_engine_from_config(_db_config())
-    job = get_job(engine, job_id)
-
+    job = _JOBS.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
@@ -134,7 +149,6 @@ async def get_job_status(job_id: str):
         "error":    job["error"],
     }
 
-    # Solo incluir resultados cuando el job ha terminado
     if job["state"] == "done":
         response["results"] = job["results"]
 
@@ -144,47 +158,11 @@ async def get_job_status(job_id: str):
 @app.patch("/jobs/{job_id}")
 async def patch_job_progress(job_id: str, body: JobProgressUpdate):
     """
-    Permite que el worker actualice el progreso desde un proceso externo
-    (útil cuando el worker corre en un contenedor separado en LifeWatch/NaaVRE).
+    Permite actualizar el progreso desde un proceso externo
+    (útil si el worker corre en un contenedor separado en LifeWatch/NaaVRE).
     """
-    engine = get_engine_from_config(_db_config())
-    job = get_job(engine, job_id)
-
-    if job is None:
+    if job_id not in _JOBS:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
-    update_job_progress(engine, job_id, body.step, body.progress)
+    _update_progress(job_id, body.step, body.progress)
     return {"job_id": job_id, "step": body.step, "progress": body.progress}
-
-
-# ---------------------------------------------------------------------------
-# Worker interno (BackgroundTask)
-# Importa el worker real para no duplicar lógica.
-# ---------------------------------------------------------------------------
-async def _run_job(job_id: str, workflow: str, config: Dict[str, Any]) -> None:
-    """
-    Wrapper async que llama al worker síncrono en un hilo separado
-    para no bloquear el event loop de FastAPI.
-    """
-    import asyncio
-    from functools import partial
-
-    loop = asyncio.get_event_loop()
-
-    if workflow == "visualization":
-        from api.worker import run_visualization_job
-        fn = partial(run_visualization_job, job_id, config, _db_config())
-    elif workflow == "calibration":
-        from api.worker import run_calibration_job
-        fn = partial(run_calibration_job, job_id, config, _db_config())
-    else:
-        engine = get_engine_from_config(_db_config())
-        fail_job(engine, job_id, f"Unknown workflow: {workflow}")
-        return
-
-    try:
-        await loop.run_in_executor(None, fn)
-    except Exception as e:
-        log.error(f"Job {job_id} crashed outside worker: {e}")
-        engine = get_engine_from_config(_db_config())
-        fail_job(engine, job_id, str(e))
