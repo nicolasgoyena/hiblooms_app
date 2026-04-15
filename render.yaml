@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: hiblooms-api
+    runtime: python
+    buildCommand: pip install -r requirements_api.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GEE_SERVICE_ACCOUNT_JSON
+        sync: false   # lo introduces manualmente en el panel de Render
