@@ -251,9 +251,8 @@ def run_visualization_job(
                 image_date_fmt = _dt.strptime(image_date, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                 layers: Dict[str, str] = {}
 
-                # Escalar y clippar directamente en el worker — no depender de hiblooms_core
-                # para garantizar que B4/B3/B2 están en reflectancia (0-1)
-                _rgb = scaled_image.select(["B4", "B3", "B2"]).divide(10000).clip(aoi)
+                # scaled_image ya viene escalada (0-1) y clippeada desde hiblooms_core
+                _rgb = scaled_image.select(["B4", "B3", "B2"])
                 layers["RGB"] = _rgb.visualize(
                     bands=["B4", "B3", "B2"], min=0, max=0.3, gamma=1.4
                 ).getMapId()["tile_fetcher"].url_format
