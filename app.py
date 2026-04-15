@@ -1639,6 +1639,9 @@ with tab3:
             st.subheader(t("avail.h"))
             df_available = pd.DataFrame(_available_dates, columns=["Fecha"])
             df_available["Fecha"] = pd.to_datetime(df_available["Fecha"])
+            # Eliminar duplicados — quedarse solo con la fecha sin hora
+            df_available["Fecha"] = df_available["Fecha"].dt.normalize()
+            df_available = df_available.drop_duplicates(subset=["Fecha"])
             df_available["Fecha_str"] = df_available["Fecha"].dt.strftime("%d-%b")
             df_available["y_base"] = 0
             timeline_chart = alt.Chart(df_available).mark_tick(thickness=2, size=20).encode(
