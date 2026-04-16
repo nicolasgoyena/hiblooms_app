@@ -563,142 +563,172 @@ with tab2:
     render_calibration_tab(obtener_nombres_embalses, load_reservoir_shapefile, gdf_to_ee_geometry)
 
 with tab3:
-    st.subheader(t("upload.shp.h"))
-    st.info(t("upload.shp.i"))
-    uploaded_zip = st.file_uploader(t("upload.shp.zip"), type=["zip"])
+
+    # ── Shapefile opcional (colapsado por defecto) ───────────────────────────
+    with st.expander(t("upload.shp.h"), expanded=False):
+        st.info(t("upload.shp.i"))
+        uploaded_zip = st.file_uploader(t("upload.shp.zip"), type=["zip"], label_visibility="collapsed")
 
     custom_shapefile_path = None
 
     if uploaded_zip is not None:
         import zipfile
         import tempfile
-
         temp_dir = tempfile.TemporaryDirectory()
         with zipfile.ZipFile(uploaded_zip, "r") as zip_ref:
             zip_ref.extractall(temp_dir.name)
-
         for file in os.listdir(temp_dir.name):
             if file.endswith(".shp"):
                 custom_shapefile_path = os.path.join(temp_dir.name, file)
                 break
-
         if custom_shapefile_path:
             st.success("✅ Shapefile cargado correctamente.")
         else:
             st.error("❌ No se encontró ningún archivo .shp válido en el ZIP.")
 
-    # ──────────────────────────────
-    st.markdown("<hr style='border: 1px solid #b4a89b; margin: 2rem 0;'>", unsafe_allow_html=True)
-    # Dividimos el contenido en dos columnas
-    row1 = st.columns([2, 2])
-    row2 = st.columns([2, 2])
+    # ── Mapa de embalses — ancho completo, altura reducida ───────────────────
+    st.markdown(
+        "<h3 style='margin:1rem 0 0.5rem;'>🗺️ " + t("map.title") + "</h3>",
+        unsafe_allow_html=True
+    )
+    map_embalses = geemap.Map(center=[42.0, 0.5], zoom=8)
+    cargar_y_mostrar_embalses(
+        map_embalses,
+        shapefile_path=custom_shapefile_path if custom_shapefile_path else "shapefiles/embalses_hiblooms.shp",
+        nombre_columna="NOMBRE"
+    )
+    folium_static(map_embalses, width=1400, height=400)
 
-    with row1[0]:
-        st.subheader(t("map.title"))
-        map_embalses = geemap.Map(center=[42.0, 0.5], zoom=8)
-        cargar_y_mostrar_embalses(
-            map_embalses,
-            shapefile_path=custom_shapefile_path if custom_shapefile_path else "shapefiles/embalses_hiblooms.shp",
-            nombre_columna="NOMBRE"
-        )
-        folium_static(map_embalses, width=1000, height=600)
+    # ── Panel de configuración ───────────────────────────────────────────────
+    st.markdown(
+        "<div style='background:#fff;border-radius:12px;padding:1.2rem 1.5rem 0.5rem;margin:1.2rem 0;border:1px solid #d6cfc4;'>"
+        "<h4 style='margin:0 0 1rem;color:#475a23;font-size:16px;letter-spacing:1px;'>⚙️ CONFIGURACIÓN</h4>",
+        unsafe_allow_html=True
+    )
 
-    with row1[1]:
-        st.subheader(t("reservoir.pick.h"))
-        nombres_embalses = obtener_nombres_embalses(custom_shapefile_path) if custom_shapefile_path else obtener_nombres_embalses()
-        reservoir_name = st.selectbox(t("reservoir.pick.label"), nombres_embalses)
+    cfg1, cfg2, cfg3 = st.columns([1.2, 1, 1.3])
 
-        if reservoir_name:
-            gdf = load_reservoir_shapefile(reservoir_name, shapefile_path=custom_shapefile_path) if custom_shapefile_path else load_reservoir_shapefile(reservoir_name)
-            if gdf is not None:
-                aoi = gdf_to_ee_geometry(gdf)
-                st.subheader(t("poi.h"))
+    nombres_embalses = obtener_nombres_embalses(custom_shapefile_path) if custom_shapefile_path else obtener_nombres_embalses()
 
-                pois_embalse = {}
-                
-                if reservoir_name in puntos_interes:
-                    st.success(t("poi.ok"))
-                    pois_embalse = puntos_interes[reservoir_name]
+    with cfg1:
+        st.markdown("**" + t("reservoir.pick.h") + "**")
+        reservoir_name = st.selectbox(t("reservoir.pick.label"), nombres_embalses, label_visibility="collapsed")
+
+    gdf = None
+    aoi = None
+    pois_embalse = {}
+    start_date = (datetime.today() - timedelta(days=15)).strftime('%Y-%m-%d')
+    end_date = datetime.today().strftime('%Y-%m-%d')
+    max_cloud_percentage = 60
+    selected_indices = []
+    available_indices = []
+
+    if reservoir_name:
+        gdf = load_reservoir_shapefile(reservoir_name, shapefile_path=custom_shapefile_path) if custom_shapefile_path else load_reservoir_shapefile(reservoir_name)
+        if gdf is not None:
+            aoi = gdf_to_ee_geometry(gdf)
+            available_indices = get_available_indices_for_reservoir(reservoir_name)
+
+            if reservoir_name in puntos_interes:
+                pois_embalse = puntos_interes[reservoir_name]
+
+            with cfg2:
+                st.markdown("**" + t("cloud.h") + "**")
+                max_cloud_percentage = st.selectbox(
+                    t("cloud.label"),
+                    options=[60, 80, 100],
+                    index=0,
+                    label_visibility="collapsed"
+                )
+
+            with cfg3:
+                st.markdown("**" + t("dates.h") + "**")
+                date_range = st.date_input(
+                    t("dates.label"),
+                    value=(datetime.today() - timedelta(days=15), datetime.today()),
+                    min_value=datetime(2017, 7, 1),
+                    max_value=datetime.today(),
+                    format="DD-MM-YYYY",
+                    label_visibility="collapsed"
+                )
+                if isinstance(date_range, tuple) and len(date_range) == 2:
+                    start_date, end_date = date_range
                 else:
+                    start_date, end_date = datetime(2017, 7, 1), datetime.today()
+                start_date = start_date.strftime('%Y-%m-%d')
+                end_date = end_date.strftime('%Y-%m-%d')
+
+            if max_cloud_percentage == 100:
+                st.info(t("cloud.100"))
+
+            # POIs
+            if not pois_embalse:
+                with st.expander(t("poi.h"), expanded=False):
                     st.warning(t("poi.none"))
-                    archivo_pois = st.file_uploader("Sube un archivo CSV con los puntos de interés", type=["csv"])
-                
+                    archivo_pois = st.file_uploader("CSV puntos de interés", type=["csv"], label_visibility="collapsed")
                     if archivo_pois is not None:
                         try:
                             df_pois = pd.read_csv(archivo_pois)
                             columnas_esperadas = {"nombre", "latitud", "longitud"}
                             columnas_archivo = set(df_pois.columns.str.lower().str.strip())
-                            
                             if columnas_esperadas.issubset(columnas_archivo):
-                                # Renombrar columnas ignorando mayúsculas/minúsculas y espacios
                                 columnas_mapeo = {col: col.lower().strip() for col in df_pois.columns}
                                 df_pois = df_pois.rename(columns=columnas_mapeo)
-                
                                 pois_embalse = {
                                     row["nombre"]: (row["latitud"], row["longitud"]) for _, row in df_pois.iterrows()
                                 }
                                 puntos_interes[reservoir_name] = pois_embalse
                                 st.success("Puntos cargados correctamente.")
                             else:
-                                st.error("❌ El archivo debe tener columnas llamadas exactamente: 'nombre', 'latitud' y 'longitud'.")
+                                st.error("❌ Columnas requeridas: 'nombre', 'latitud', 'longitud'.")
                         except Exception as e:
-                            st.error(f"❌ Error al leer el archivo: {e}")
-                
-                if pois_embalse:
-                    st.markdown(t("poi.active"))
-                    st.dataframe(pd.DataFrame([
-                        {"nombre": nombre, "latitud": lat, "longitud": lon} for nombre, (lat, lon) in pois_embalse.items()
-                    ]))
+                            st.error(f"❌ Error: {e}")
 
-                # Slider de nubosidad
-                st.subheader(t("cloud.h"))
-                max_cloud_percentage = st.selectbox(
-                    t("cloud.label"),
-                    options=[60, 80, 100],
-                    index=0
-                )
-                if max_cloud_percentage == 100:
-                    st.info(t("cloud.100"))
+    st.markdown("</div>", unsafe_allow_html=True)
 
-                # Selección de intervalo de fechas
-                st.subheader(t("dates.h"))
-                date_range = st.date_input(t("dates.label"), value=(datetime.today() - timedelta(days=15), datetime.today()),
-                                           min_value=datetime(2017, 7, 1), max_value=datetime.today(), format="DD-MM-YYYY")
+    # ── Índices + Botón calcular ─────────────────────────────────────────────
+    st.markdown(
+        "<div style='background:#fff;border-radius:12px;padding:1.2rem 1.5rem;margin:0.5rem 0 1rem;border:1px solid #d6cfc4;'>",
+        unsafe_allow_html=True
+    )
+    idx_col, btn_col = st.columns([3, 1])
+    with idx_col:
+        st.markdown("**" + t("idx.h") + "**")
+        selected_indices = st.multiselect(t("idx.label"), available_indices, label_visibility="collapsed")
+        with st.expander(t("idx.help")):
+            if lang() == "es":
+                st.markdown("""
+                - **MCI:** Detecta altas concentraciones de clorofila-a.
+                - **PCI_B5/B4:** Indicador espectral de ficocianina general.
+                - **NDCI_ind:** Índice normalizado de clorofila-a.
+                - **UV_PC_Gral_cal:** Estimación cuantitativa de ficocianina (µg/L).
+                - **PC_Val_cal:** Ficocianina calibrada para El Val (µg/L).
+                - **Chla_Val_cal:** Clorofila-a calibrada para El Val (µg/L).
+                - **Chla_Bellus_cal:** Clorofila-a calibrada para Bellús (µg/L).
+                - **PC_Bellus_cal:** Ficocianina calibrada para Bellús (µg/L).
+                """)
+            else:
+                st.markdown("""
+                - **MCI:** Detects high chlorophyll-a concentrations.
+                - **PCI_B5/B4:** General spectral phycocyanin indicator.
+                - **NDCI_ind:** Normalized chlorophyll-a index.
+                - **UV_PC_Gral_cal:** Quantitative phycocyanin estimate (µg/L).
+                - **PC_Val_cal:** Phycocyanin calibrated for El Val (µg/L).
+                - **Chla_Val_cal:** Chlorophyll-a calibrated for El Val (µg/L).
+                - **Chla_Bellus_cal:** Chlorophyll-a calibrated for Bellús (µg/L).
+                - **PC_Bellus_cal:** Phycocyanin calibrated for Bellús (µg/L).
+                """)
+    with btn_col:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        calcular = st.button(t("btn.compute"), use_container_width=True)
 
-                # Extraer fechas seleccionadas
-                if isinstance(date_range, tuple) and len(date_range) == 2:
-                    start_date, end_date = date_range
-                else:
-                    start_date, end_date = datetime(2017, 7, 1), datetime.today()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-                start_date = start_date.strftime('%Y-%m-%d')
-                end_date = end_date.strftime('%Y-%m-%d')
+    # Separador
+    st.markdown("<hr style='border:1px solid #b4a89b;margin:0.5rem 0 1.5rem;'>", unsafe_allow_html=True)
 
-                # Selección de índices
-                st.subheader(t("idx.h"))
-                available_indices = get_available_indices_for_reservoir(reservoir_name)
-                selected_indices = st.multiselect(t("idx.label"), available_indices)
-                with st.expander(t("idx.help")):
-                    if lang()=="es":
-                        st.markdown("""
-                        - **MCI (Maximum Chlorophyll Index):** Detecta altas concentraciones de clorofila-a, útil para identificar blooms intensos.
-                        - **PCI_B5/B4:** Relación espectral entre el infrarrojo cercano (B5) y el rojo (B4), es un buen indicador de ficocianina para todo tipo de embalses, pero no proporciona concentraciones directas.
-                        - **NDCI_ind (Normalized Difference Chlorophyll Index):** Relación normalizada entre bandas del rojo e infrarrojo cercano. Se asocia a clorofila-a.
-                        - **UV_PC_Gral_cal:** Estimación cuantitativa general de ficocianina basada en la relación espectral entre el infrarrojo cercano (B5) y el rojo (B4). Ajustada mediante una función exponencial, proporciona concentraciones aproximadas de ficocianina en µg/L. Desarrollado por la Universidad de Valencia a partir de datos del estudio en embalses de la cuenca del Ebro (Pérez-González et al., 2021).
-                        - **PC_Val_cal (Ficocianina en El Val):** Estimador cuantitativo de ficocianina, un pigmento exclusivo de cianobacterias. Basado en la relación espectral entre el infrarrojo cercano y el rojo, ha sido ajustado a partir de mediciones de ficocianina en el Embalse de El Val.
-                        - **Chla_Val_cal:** Calibración cuantitativa de clorofila-a derivada del NDCI mediante ajuste exponencial a partir de mediciones en el embalse de El Val.
-                        - **Chla_Bellus_cal:** Estimación cuantitativa de clorofila-a específicamente calibrada para el embalse de Bellús.
-                        - **PC_Bellus_cal (Ficocianina Bellús):** Ajuste específico para el embalse de Bellús, basado en la fórmula empírica derivada de la relación espectral MCI. Se estima la concentración de ficocianina en µg/L.
-                        """)
-                    else:
-                        st.markdown("""- **MCI** ... (traducción EN del resumen)""")
-
-                # Botón fuera del if
-                # ── BOTÓN DE CÁLCULO ASÍNCRONO ──────────────────────────────────────────
-                calcular = st.button(t("btn.compute"))
-
-                # Separador siempre visible
-    st.markdown("<hr style='border: 1px solid #b4a89b; margin: 2rem 0;'>", unsafe_allow_html=True)
+    # Columnas para resultados
+    row2 = st.columns([2, 2])
 
                 # Al pulsar el botón: construir el payload y enviarlo a la API de jobs
     if calcular:
