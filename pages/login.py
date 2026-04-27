@@ -6,7 +6,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Inject CSS theme + login page styles
 with open("styles.css", "r", encoding="utf-8") as _f:
     st.markdown(f"<style>{_f.read()}</style>", unsafe_allow_html=True)
 
@@ -14,79 +13,67 @@ st.markdown("""
 <style>
   [data-testid="stSidebarNav"] { display: none; }
 
-  /* Center the login card */
-  .login-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 80vh;
-  }
   .login-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    padding: 3rem 3rem 2.5rem;
+    background: #ffffff;
+    border: 1px solid #e2ecf0;
+    border-radius: 24px;
+    padding: 2.8rem 3rem 2.2rem;
     width: 100%;
-    max-width: 440px;
+    max-width: 420px;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,168,150,.10), 0 2px 8px rgba(15,31,46,.06);
+    margin: auto;
   }
   .login-card::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #00d4ff, #00e5b4, #00d4ff);
-    background-size: 200% 100%;
+    height: 4px;
+    background: linear-gradient(90deg, #00a896, #10b981, #00a896);
+    background-size: 200%;
     animation: shimmer 3s linear infinite;
   }
   @keyframes shimmer {
     0%   { background-position: 200% 0; }
     100% { background-position: -200% 0; }
   }
-  .login-logo-area {
+  .login-icon {
+    font-size: 2.6rem;
     text-align: center;
-    margin-bottom: 2rem;
+    margin-bottom: .6rem;
+    display: block;
   }
   .login-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.8rem;
-    font-weight: 800;
-    color: #e8f4ff;
+    font-family: 'Cabinet Grotesk', sans-serif;
+    font-size: 2rem;
+    font-weight: 900;
+    text-align: center;
+    color: #0f1f2e;
     letter-spacing: -0.03em;
-    margin: 0.75rem 0 0.25rem;
     line-height: 1;
+    margin-bottom: .3rem;
   }
-  .login-title span {
-    background: linear-gradient(135deg, #00d4ff, #00e5b4);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
+  .login-title span { color: #00a896; }
   .login-sub {
-    font-size: 12px;
-    color: var(--text-secondary);
-    letter-spacing: 0.08em;
+    text-align: center;
+    font-size: 11px;
+    color: #8fa3b0;
+    letter-spacing: .08em;
     text-transform: uppercase;
     margin-bottom: 0;
   }
   .login-divider {
     height: 1px;
-    background: var(--border);
-    margin: 1.5rem 0;
+    background: #e2ecf0;
+    margin: 1.5rem 0 1.25rem;
   }
   .login-footer {
     text-align: center;
     font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 1.5rem;
-    letter-spacing: 0.05em;
-  }
-  .sat-icon {
-    font-size: 2.5rem;
-    display: block;
-    margin-bottom: 0.5rem;
-    filter: drop-shadow(0 0 12px rgba(0,212,255,0.5));
+    color: #8fa3b0;
+    margin-top: 1.25rem;
+    letter-spacing: .04em;
   }
 </style>
 """, unsafe_allow_html=True)
@@ -104,7 +91,8 @@ def cargar_usuarios():
 users = cargar_usuarios()
 
 query_params = st.query_params
-admin_mode = query_params.get("admin", ["false"])[0].lower() == "true" if isinstance(query_params.get("admin", "false"), list) else str(query_params.get("admin", "false")).lower() == "true"
+admin_val = query_params.get("admin", "false")
+admin_mode = (admin_val if isinstance(admin_val, str) else admin_val[0]).lower() == "true"
 
 if admin_mode and not st.session_state.get("logged_in", False):
     st.session_state["logged_in"] = True
@@ -115,22 +103,20 @@ if st.session_state.get("logged_in", False):
     st.switch_page("app.py")
     st.stop()
 
-# ── Layout: center column ──────────────────────────────────────
-_, col, _ = st.columns([1, 1.2, 1])
+# ── Centrado vertical ──────────────────────────────────────────
+st.markdown("<div style='height:6vh'></div>", unsafe_allow_html=True)
+_, col, _ = st.columns([1, 1.1, 1])
 
 with col:
     st.markdown("""
     <div class="login-card">
-      <div class="login-logo-area">
-        <span class="sat-icon">🛰</span>
-        <div class="login-title">HI<span>BLOOMS</span></div>
-        <div class="login-sub">Sistema de monitorización satelital</div>
-      </div>
+      <span class="login-icon">🛰</span>
+      <div class="login-title">HI<span>BLOOMS</span></div>
+      <div class="login-sub">Sistema de monitorización satelital</div>
       <div class="login-divider"></div>
     </div>
     """, unsafe_allow_html=True)
 
-    # The actual form sits below — styled via global CSS
     user = st.text_input("Usuario", placeholder="Introduce tu usuario")
     pwd  = st.text_input("Contraseña", type="password", placeholder="••••••••")
     submit = st.button("Iniciar sesión", use_container_width=True)
