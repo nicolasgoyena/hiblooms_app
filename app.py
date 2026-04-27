@@ -355,14 +355,18 @@ def generar_leyenda(indices_seleccionados):
 with open("styles.css", "r", encoding="utf-8") as _f:
     st.markdown(f"<style>{_f.read()}</style>", unsafe_allow_html=True)
 
-# ── Header: hero + logos + idioma ─────────────────────────────
-_hdr_left, _hdr_center, _hdr_right = st.columns([1.2, 3.5, 1.5])
+# ── Header: logos originales + título + idioma ────────────────
+_hdr_left, _hdr_center, _hdr_right = st.columns([1.3, 3.5, 1.8])
 
 with _hdr_left:
-    st.image("images/logo_hiblooms.png", width=200)
+    st.image("images/logo_hiblooms.png", width=190)
+    _min_c1, _min_c2 = st.columns([1, 1])
+    with _min_c1:
+        st.image("images/ministerio.png", width=100)
+    with _min_c2:
+        st.image("images/logo_unav.png", width=90)
 
 with _hdr_center:
-    _lang_display = "ES" if lang() == "es" else "EN"
     st.markdown(
         f"""
         <div class="hb-hero">
@@ -378,14 +382,12 @@ with _hdr_center:
     )
 
 with _hdr_right:
-    _logo_c1, _logo_c2 = st.columns([1, 1])
-    with _logo_c1:
-        st.image("images/logo_bioma.png", width=120)
+    st.image("images/logo_bioma.png", width=180)
+    _ebro_c, _jucar_c = st.columns([1, 1])
+    with _ebro_c:
         st.image("images/logo_ebro.png", width=110)
-    with _logo_c2:
-        st.image("images/ministerio.png", width=120)
-        st.image("images/logo_jucar.png", width=130)
-
+    with _jucar_c:
+        st.image("images/logo_jucar.png", width=120)
     chosen = st.selectbox(
         t("ui.language"),
         options=_LANGS,
@@ -404,14 +406,14 @@ with tab1:
     # ==== Contenido bilingüe ====
     if lang() == "es":
         st.markdown("""
-            <div class="hb-info-panel" style="text-align:center; border-left-width:0; border-top: 3px solid #00d4ff; background: linear-gradient(135deg, rgba(0,212,255,0.06), rgba(0,229,180,0.04));">
-              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#7a99bb;margin-bottom:.5rem;">PID2023-153234OB-I00</div>
-              <div style="font-size:1.05rem;font-weight:700;color:#e8f4ff;line-height:1.4;">Reconstrucción histórica y estado actual de la proliferación de cianobacterias en embalses españoles: <span style="color:#00d4ff;">HIBLOOMS</span></div>
+            <div class="hb-info-panel" style="text-align:center; border-left-width:0; border-top: 3px solid #00a896; background: linear-gradient(135deg, rgba(0,168,150,0.08), rgba(16,185,129,0.05));">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#4a6372;margin-bottom:.5rem;">PID2023-153234OB-I00</div>
+              <div style="font-size:1.05rem;font-weight:700;color:#0f1f2e;line-height:1.4;">Reconstrucción histórica y estado actual de la proliferación de cianobacterias en embalses españoles: <span style="color:#00a896;">HIBLOOMS</span></div>
             </div>
         """, unsafe_allow_html=True)
         st.markdown("""
             <div class="hb-info-panel">
-              <div class="hb-card-label">Alineación con estrategias nacionales</div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#4a6372;margin-bottom:.5rem;">Alineación con estrategias nacionales</div>
               <div style="margin-top:.5rem;display:flex;flex-direction:column;gap:.4rem;">
                 <div><span class="hb-badge hb-badge-info">PNACC</span> Plan Nacional de Adaptación al Cambio Climático (2021-2030)</div>
                 <div><span class="hb-badge hb-badge-info">DMA</span> Directiva Marco del Agua 2000/60/EC</div>
@@ -485,7 +487,7 @@ with tab1:
 
     else:
         st.markdown(
-            '<div class="hb-info-panel" style="text-align:center;border-left:none;border-top:3px solid #00d4ff;"><span style="color:#00d4ff;font-weight:700;">HIBLOOMS</span> — Historical Reconstruction and Current Status · PID2023-153234OB-I00</div>',
+            '<div class="hb-info-panel" style="text-align:center;border-left-width:0;border-top:3px solid #00a896;background:linear-gradient(135deg,rgba(0,168,150,.08),rgba(16,185,129,.05));"><div style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#4a6372;margin-bottom:.4rem;\">PID2023-153234OB-I00</div><div style=\"font-size:1.05rem;font-weight:700;color:#0f1f2e;line-height:1.4;\">Historical Reconstruction and Current Status of Cyanobacterial Blooms in Spanish Reservoirs: <span style=\"color:#00a896;\">HIBLOOMS</span></div></div>',
             unsafe_allow_html=True)
 
         st.markdown(
