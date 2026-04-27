@@ -351,85 +351,77 @@ def generar_leyenda(indices_seleccionados):
 
 # INTERFAZ DE STREAMLIT
 
-# Cargar CSS desde archivo externo
+# ── Cargar CSS tema oscuro ─────────────────────────────────────
 with open("styles.css", "r", encoding="utf-8") as _f:
     st.markdown(f"<style>{_f.read()}</style>", unsafe_allow_html=True)
 
+# ── Header: hero + logos + idioma ─────────────────────────────
+_hdr_left, _hdr_center, _hdr_right = st.columns([1.2, 3.5, 1.5])
 
-col1, col2, col3 = st.columns([1, 4, 1.25])
+with _hdr_left:
+    st.image("images/logo_hiblooms.png", width=200)
 
-with col1:
-    st.image("images/logo_hiblooms.png", width=280)
-    st.image("images/ministerio.png", width=280)
-
-with col2:
+with _hdr_center:
+    _lang_display = "ES" if lang() == "es" else "EN"
     st.markdown(
         f"""
-        <h1 style="text-align: center; line-height: 1.1em; font-size: 32px; margin: 0.3em 0;">
-            {t("hero.l1")}
-            <br><span style="display: block; text-align: center;">{t("hero.l2")}</span>
-        </h1>
+        <div class="hb-hero">
+          <div class="hb-hero-title">
+            <span>HI</span>BLOOMS
+          </div>
+          <div class="hb-hero-sub">
+            🛰&nbsp; {t("hero.l1")} &nbsp;·&nbsp; {t("hero.l2")}
+          </div>
+        </div>
         """,
         unsafe_allow_html=True
     )
 
-with col3:
-    st.image("images/logo_bioma.png", width=320)
-    col3a, col3b = st.columns([1, 1])
-    with col3a:
-        st.image("images/logo_ebro.png", width=130)
-    with col3b:
-        st.image("images/logo_jucar.png", width=170)
+with _hdr_right:
+    _logo_c1, _logo_c2 = st.columns([1, 1])
+    with _logo_c1:
+        st.image("images/logo_bioma.png", width=120)
+        st.image("images/logo_ebro.png", width=110)
+    with _logo_c2:
+        st.image("images/ministerio.png", width=120)
+        st.image("images/logo_jucar.png", width=130)
 
-    # === Selector de idioma ===
-    st.write("")  # pequeño respiro
     chosen = st.selectbox(
         t("ui.language"),
         options=_LANGS,
-        format_func=lambda x: "Español" if x=="es" else "English",
+        format_func=lambda x: "🇪🇸 Español" if x == "es" else "🇬🇧 English",
         index=_LANGS.index(lang()),
     )
     if chosen != lang():
         set_lang(chosen)
 
+st.markdown('<div class="hb-divider"></div>', unsafe_allow_html=True)
+
 
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([t("tabs.intro"), "Calibration", t("tabs.map"), t("tabs.tables"), t("tabs.quick")])
 with tab1:
-    # ==== Estilos: los dejas tal cual ====
-    st.markdown("""
-        <style>
-            .header {
-                font-size: 24px;
-                font-weight: bold;
-                text-align: center;
-                padding: 10px;
-                background-color: #1f77b4;
-                color: white;
-                border-radius: 10px;
-                margin-bottom: 20px;
-            }
-            .info-box {
-                padding: 15px;
-                border-radius: 10px;
-                background-color: #f4f4f4;
-                margin-bottom: 15px;
-            }
-            .highlight {
-                font-weight: bold;
-                color: #1f77b4;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # ==== Contenido bilingüe con el MISMO formato ====
+    # ==== Contenido bilingüe ====
     if lang() == "es":
-        st.markdown(
-            '<div class="header">Reconstrucción histórica y estado actual de la proliferación de cianobacterias en embalses españoles: HIBLOOMS (PID2023-153234OB-I00) </div>',
-            unsafe_allow_html=True)
+        st.markdown("""
+            <div class="hb-info-panel" style="text-align:center; border-left-width:0; border-top: 3px solid #00d4ff; background: linear-gradient(135deg, rgba(0,212,255,0.06), rgba(0,229,180,0.04));">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#7a99bb;margin-bottom:.5rem;">PID2023-153234OB-I00</div>
+              <div style="font-size:1.05rem;font-weight:700;color:#e8f4ff;line-height:1.4;">Reconstrucción histórica y estado actual de la proliferación de cianobacterias en embalses españoles: <span style="color:#00d4ff;">HIBLOOMS</span></div>
+            </div>
+        """, unsafe_allow_html=True)
+        st.markdown("""
+            <div class="hb-info-panel">
+              <div class="hb-card-label">Alineación con estrategias nacionales</div>
+              <div style="margin-top:.5rem;display:flex;flex-direction:column;gap:.4rem;">
+                <div><span class="hb-badge hb-badge-info">PNACC</span> Plan Nacional de Adaptación al Cambio Climático (2021-2030)</div>
+                <div><span class="hb-badge hb-badge-info">DMA</span> Directiva Marco del Agua 2000/60/EC</div>
+                <div><span class="hb-badge hb-badge-ok">ODS 6</span> Agua limpia y saneamiento</div>
+              </div>
+            </div>
+        """, unsafe_allow_html=True)
 
         st.markdown(
-            '<div class="info-box"><b>Alineación con estrategias nacionales:</b><br>📌 Plan Nacional de Adaptación al Cambio Climático (PNACC 2021-2030)<br>📌 Directiva Marco del Agua 2000/60/EC<br>📌 Objetivo de Desarrollo Sostenible 6: Agua limpia y saneamiento</div>',
+            '<div class="hb-info-panel"><b>Alineación con estrategias nacionales:</b><br>📌 Plan Nacional de Adaptación al Cambio Climático (PNACC 2021-2030)<br>📌 Directiva Marco del Agua 2000/60/EC<br>📌 Objetivo de Desarrollo Sostenible 6: Agua limpia y saneamiento</div>',
             unsafe_allow_html=True)
 
         st.subheader("Justificación")
@@ -462,7 +454,7 @@ with tab1:
 
         st.subheader("Equipo de Investigación")
         st.markdown("""
-            <div class="info-box">
+            <div class="hb-info-panel">
                 <b>Equipo de Investigación:</b><br>
                 🔬 <b>David Elustondo (DEV)</b> - BIOMA/UNAV, calidad del agua, QA/QC y biogeoquímica.<br>
                 🔬 <b>Yasser Morera Gómez (YMG)</b> - BIOMA/UNAV, geoquímica isotópica y geocronología con <sup>210</sup>Pb.<br>
@@ -473,7 +465,7 @@ with tab1:
                 🔬 <b>Sheila Izquieta Rojano (SIR)</b> - BIOMA/UNAV, SIG y teledetección, datos FAIR, digitalización.<br>
             </div>
 
-            <div class="info-box">
+            <div class="hb-info-panel">
                 <b>Equipo de Trabajo:</b><br>
                 🔬 <b>Aimee Valle Pombrol (AVP)</b> - BIOMA/UNAV, taxonomía de cianobacterias e identificación de toxinas.<br>
                 🔬 <b>Carlos Manuel Alonso Hernández (CAH)</b> - Laboratorio de Radioecología/IAEA, geocronología con <sup>210</sup>Pb.<br>
@@ -493,11 +485,11 @@ with tab1:
 
     else:
         st.markdown(
-            '<div class="header">Historical Reconstruction and Current Status of Cyanobacterial Blooms in Spanish Reservoirs (HIBLOOMS)</div>',
+            '<div class="hb-info-panel" style="text-align:center;border-left:none;border-top:3px solid #00d4ff;"><span style="color:#00d4ff;font-weight:700;">HIBLOOMS</span> — Historical Reconstruction and Current Status · PID2023-153234OB-I00</div>',
             unsafe_allow_html=True)
 
         st.markdown(
-            '<div class="info-box"><b>Alignment with National Strategies:</b><br>📌 National Climate Change Adaptation Plan (PNACC 2021–2030)<br>📌 EU Water Framework Directive 2000/60/EC<br>📌 Sustainable Development Goal 6: Clean Water and Sanitation</div>',
+            '<div class="hb-info-panel"><b>Alignment with National Strategies:</b><br>📌 National Climate Change Adaptation Plan (PNACC 2021–2030)<br>📌 EU Water Framework Directive 2000/60/EC<br>📌 Sustainable Development Goal 6: Clean Water and Sanitation</div>',
             unsafe_allow_html=True)
 
         st.subheader("Rationale")
@@ -530,7 +522,7 @@ with tab1:
 
         st.subheader("Research Team")
         st.markdown("""
-            <div class="info-box">
+            <div class="hb-info-panel">
                 <b>Research Team:</b><br>
                 🔬 <b>David Elustondo (DEV)</b> – BIOMA/UNAV, water quality, QA/QC, biogeochemistry.<br>
                 🔬 <b>Yasser Morera Gómez (YMG)</b> – BIOMA/UNAV, isotopic geochemistry and <sup>210</sup>Pb geochronology.<br>
@@ -541,7 +533,7 @@ with tab1:
                 🔬 <b>Sheila Izquieta Rojano (SIR)</b> – BIOMA/UNAV, GIS & remote sensing, FAIR data, digitalization.<br>
             </div>
 
-            <div class="info-box">
+            <div class="hb-info-panel">
                 <b>Collaborating Team:</b><br>
                 🔬 <b>Aimee Valle Pombrol (AVP)</b> – BIOMA/UNAV, cyanobacteria taxonomy and toxin identification.<br>
                 🔬 <b>Carlos Manuel Alonso Hernández (CAH)</b> – Radioecology Laboratory/IAEA, <sup>210</sup>Pb geochronology.<br>
@@ -588,7 +580,7 @@ with tab3:
             st.error("❌ No se encontró ningún archivo .shp válido en el ZIP.")
 
     # ──────────────────────────────
-    st.markdown("<hr style='border: 1px solid #b4a89b; margin: 2rem 0;'>", unsafe_allow_html=True)
+    st.markdown('<div class="hb-divider"></div>', unsafe_allow_html=True)
     # Dividimos el contenido en dos columnas
     row1 = st.columns([2, 2])
     row2 = st.columns([2, 2])
@@ -698,7 +690,7 @@ with tab3:
                 calcular = st.button(t("btn.compute"))
 
                 # Separador siempre visible
-    st.markdown("<hr style='border: 1px solid #b4a89b; margin: 2rem 0;'>", unsafe_allow_html=True)
+    st.markdown('<div class="hb-divider"></div>', unsafe_allow_html=True)
 
                 # Al pulsar el botón: construir el payload y enviarlo a la API de jobs
     if calcular:
