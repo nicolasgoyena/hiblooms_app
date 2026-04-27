@@ -356,13 +356,13 @@ with open("styles.css", "r", encoding="utf-8") as _f:
     st.markdown(f"<style>{_f.read()}</style>", unsafe_allow_html=True)
 
 # ── Header: logos originales + título + idioma ────────────────
-_hdr_left, _hdr_center, _hdr_right = st.columns([1.3, 3.5, 1.8])
+_hdr_left, _hdr_center, _hdr_right = st.columns([1.6, 3.0, 1.8])
 
 with _hdr_left:
-    st.image("images/logo_hiblooms.png", width=190)
-    _min_c1, _min_c2 = st.columns([1, 1])
+    st.image("images/logo_hiblooms.png", width=240)
+    _min_c1, _min_c2 = st.columns([1.6, 1])
     with _min_c1:
-        st.image("images/ministerio.png", width=100)
+        st.image("images/ministerio.png", width=160)
     with _min_c2:
         st.image("images/logo_unav.png", width=90)
 
@@ -382,10 +382,10 @@ with _hdr_center:
     )
 
 with _hdr_right:
-    st.image("images/logo_bioma.png", width=180)
-    _ebro_c, _jucar_c = st.columns([1, 1])
+    st.image("images/logo_bioma.png", width=200)
+    _ebro_c, _jucar_c = st.columns([1, 1.2])
     with _ebro_c:
-        st.image("images/logo_ebro.png", width=110)
+        st.image("images/logo_ebro.png", width=100)
     with _jucar_c:
         st.image("images/logo_jucar.png", width=120)
     chosen = st.selectbox(
@@ -401,7 +401,7 @@ st.markdown('<div class="hb-divider"></div>', unsafe_allow_html=True)
 
 
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([t("tabs.intro"), "Calibration", t("tabs.map"), t("tabs.tables"), t("tabs.quick")])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([t("tabs.intro"), t("tabs.calibration"), t("tabs.map"), t("tabs.tables"), t("tabs.quick")])
 with tab1:
     # ==== Contenido bilingüe ====
     if lang() == "es":
@@ -554,7 +554,7 @@ with tab1:
         st.success("🔬 HIBLOOMS not only studies the present, but also reconstructs the past to better understand the future of water quality in Spain.")
 
 with tab2:
-    render_calibration_tab(obtener_nombres_embalses, load_reservoir_shapefile, gdf_to_ee_geometry)
+    render_calibration_tab(obtener_nombres_embalses, load_reservoir_shapefile, gdf_to_ee_geometry, lang=lang())
 
 with tab3:
     st.subheader(t("upload.shp.h"))
