@@ -367,7 +367,7 @@ with _hdr_center:
         f"""
         <div class="hb-hero">
           <div class="hb-hero-title">
-            <span>HI</span>BLOOMS
+            HI<span>BLOOMS</span>
           </div>
           <div class="hb-hero-sub">
             🛰&nbsp; {t("hero.l1")} &nbsp;·&nbsp; {t("hero.l2")}
