@@ -689,25 +689,24 @@ def render_calibration_tab(
     obtener_nombres_embalses: Callable[..., list[str]],
     load_reservoir_shapefile: Callable[..., Any],
     gdf_to_ee_geometry: Callable[..., Any],
+    lang: str = "es",
 ):
-    st.subheader("🧪 Calibration workflow")
-    st.caption(
-        "Upload in situ data, extract candidate Sentinel-2 predictors for matching dates, "
-        "and fit a calibration model inside the app."
-    )
+    from i18n import STR as _CAL_STR
+    def _t(key):
+        return _CAL_STR.get(lang, {}).get(key) or _CAL_STR["es"].get(key, key)
 
-    reservoir_name = st.selectbox("Reservoir for calibration", obtener_nombres_embalses(), key="cal_reservoir")
-    csv_file = st.file_uploader("In situ CSV", type=["csv"], key="cal_csv")
+    st.subheader(_t("cal.title"))
+    st.caption(_t("cal.caption"))
+
+    reservoir_name = st.selectbox(_t("cal.reservoir"), obtener_nombres_embalses(), key="cal_reservoir")
+    csv_file = st.file_uploader(_t("cal.csv"), type=["csv"], key="cal_csv")
 
     if csv_file is None:
-        st.info(
-            "Upload a CSV with at least these columns: `date`, `time`, and one numeric target variable "
-            "such as `phycocyanin` or `chlorophyll`."
-        )
+        st.info(_t("cal.info"))
         return
 
     df_raw = pd.read_csv(csv_file)
-    st.write("Preview of uploaded data")
+    st.write(_t("cal.preview"))
     st.dataframe(df_raw.head(10), use_container_width=True)
 
     excluded = {"date", "time"}
@@ -716,15 +715,15 @@ def render_calibration_tab(
         if c not in excluded and pd.to_numeric(df_raw[c], errors="coerce").notna().sum() > 0
     ]
     if not numeric_candidates:
-        st.error("No numeric candidate target variables were found in the CSV.")
+        st.error(_t("cal.no_numeric"))
         return
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        target_variable = st.selectbox("Target variable", numeric_candidates, key="cal_target")
-        start_hour, end_hour = st.slider("Broad hour window (UTC)", 0, 23, (8, 15), key="cal_hours")
+        target_variable = st.selectbox(_t("cal.target"), numeric_candidates, key="cal_target")
+        start_hour, end_hour = st.slider(_t("cal.hours"), 0, 23, (8, 15), key="cal_hours")
         overpass_window = st.slider(
-            "Match window around overpass (hours)",
+            _t("cal.match_window"),
             0.25,
             4.0,
             1.5,
@@ -732,26 +731,26 @@ def render_calibration_tab(
             key="cal_match_window",
         )
     with col2:
-        max_cloud = st.slider("Max cloud percentage", 0, 100, 20, key="cal_max_cloud")
-        min_coverage = st.slider("Min AOI coverage (%)", 0, 100, 50, key="cal_min_coverage")
+        max_cloud = st.slider(_t("cal.max_cloud"), 0, 100, 20, key="cal_max_cloud")
+        min_coverage = st.slider(_t("cal.min_coverage"), 0, 100, 50, key="cal_min_coverage")
     with col3:
         predictor_set = st.multiselect(
-            "Candidate predictors",
+            _t("cal.predictors"),
             CANDIDATE_INDICES,
             default=["NDCI_705_665", "R705_R665", "MCI_705"],
             key="cal_predictors",
         )
         model_names = ["linear", "ridge", "lasso", "elastic_net", "poly2", "poly3", "svr_rbf", "random_forest", "gradient_boosting"]
         selected_models = st.multiselect(
-            "Models to test",
+            _t("cal.models"),
             model_names,
             default=["linear", "ridge", "poly2", "svr_rbf"],
             key="cal_models",
         )
-        cv_scheme = st.selectbox("CV scheme", ["kfold", "timeseries"], index=0, key="cal_cv")
-        outlier_method = st.selectbox("Outlier handling", ["iqr", "none"], index=0, key="cal_outliers")
+        cv_scheme = st.selectbox(_t("cal.cv"), ["kfold", "timeseries"], index=0, key="cal_cv")
+        outlier_method = st.selectbox(_t("cal.outliers"), ["iqr", "none"], index=0, key="cal_outliers")
         min_samples_required = st.slider(
-            "Minimum matched samples required",
+            _t("cal.min_samples"),
             min_value=4,
             max_value=20,
             value=6,
@@ -760,11 +759,11 @@ def render_calibration_tab(
         )
 
     if not predictor_set:
-        st.warning("Select at least one predictor.")
+        st.warning(_t("cal.warn_predictor"))
         return
 
     if not selected_models:
-        st.warning("Select at least one candidate model.")
+        st.warning(_t("cal.warn_model"))
         return
 
     # ── IMPORTS ASÍNCRONOS (solo necesarios aquí) ────────────────────────────
