@@ -403,6 +403,193 @@ st.markdown('<div class="hb-divider"></div>', unsafe_allow_html=True)
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([t("tabs.intro"), t("tabs.calibration"), t("tabs.map"), t("tabs.tables"), t("tabs.quick")])
 with tab1:
+
+    # ── HERO BANNER ────────────────────────────────────────────
+    _hero_es = """
+        <div style="position:relative;border-radius:16px;overflow:hidden;background:linear-gradient(135deg,#0a2a2a 0%,#0d3d35 40%,#0a2e3a 100%);padding:2.8rem 3rem;margin-bottom:1.5rem;box-shadow:0 4px 24px rgba(0,168,150,.18)">
+            <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:.08" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                    <pattern id="wavep" x="0" y="0" width="120" height="40" patternUnits="userSpaceOnUse"><path d="M0 20 Q30 5 60 20 Q90 35 120 20" stroke="#00e5b4" stroke-width="1.5" fill="none"/></pattern>
+                    <pattern id="dotsp" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse"><circle cx="15" cy="15" r="1.2" fill="#00d4ff"/></pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#dotsp)"/>
+                <rect width="100%" height="100%" fill="url(#wavep)" opacity="0.6"/>
+            </svg>
+            <svg style="position:absolute;right:2rem;top:50%;transform:translateY(-50%);opacity:.12;width:160px;height:160px" viewBox="0 0 160 160">
+                <ellipse cx="80" cy="80" rx="70" ry="30" stroke="#00d4ff" stroke-width="1" fill="none" stroke-dasharray="4 3"/>
+                <ellipse cx="80" cy="80" rx="50" ry="50" stroke="#00e5b4" stroke-width="0.8" fill="none" stroke-dasharray="3 4"/>
+                <circle cx="80" cy="50" r="5" fill="#00d4ff"/>
+                <rect x="75" y="46" width="10" height="8" fill="none" stroke="#00d4ff" stroke-width="0.8"/>
+                <rect x="64" y="49" width="10" height="3" fill="#00d4ff" opacity=".6"/>
+                <rect x="86" y="49" width="10" height="3" fill="#00d4ff" opacity=".6"/>
+            </svg>
+            <div style="position:relative;z-index:1;max-width:75%">
+                <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.25);border-radius:999px;padding:3px 12px;margin-bottom:1rem">
+                    <span style="width:6px;height:6px;border-radius:50%;background:#39d98a;display:inline-block"></span>
+                    <span style="font-size:11px;font-weight:600;letter-spacing:.08em;color:#00d4ff;font-family:DM Sans,sans-serif;text-transform:uppercase">Monitorización activa · Sentinel-2</span>
+                </div>
+                <div style="font-family:Cabinet Grotesk,sans-serif;font-size:clamp(1.4rem,2.5vw,2rem);font-weight:900;color:#fff;line-height:1.15;letter-spacing:-.02em;margin-bottom:.75rem">
+                    Vigilancia satelital de<br><span style="color:#00e5b4">cianobacterias</span> en embalses
+                </div>
+                <div style="font-size:13px;color:rgba(255,255,255,.6);font-family:DM Sans,sans-serif;line-height:1.6;max-width:520px">
+                    Reconstrucción histórica y monitorización en tiempo casi-real de la proliferación de cianobacterias en embalses españoles mediante teledetección Sentinel-2 · <span style="color:#00e5b4;font-weight:500">PID2023-153234OB-I00</span>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:1.25rem;flex-wrap:wrap">
+                    <div style="background:rgba(0,229,180,.12);border:1px solid rgba(0,229,180,.25);border-radius:8px;padding:6px 14px;font-size:12px;color:#00e5b4;font-family:DM Sans,sans-serif;font-weight:500">🛰 24 embalses</div>
+                    <div style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.25);border-radius:8px;padding:6px 14px;font-size:12px;color:#00d4ff;font-family:DM Sans,sans-serif;font-weight:500">📅 Desde 2017</div>
+                    <div style="background:rgba(240,165,0,.12);border:1px solid rgba(240,165,0,.25);border-radius:8px;padding:6px 14px;font-size:12px;color:#f0a500;font-family:DM Sans,sans-serif;font-weight:500">⚠ 3 alertas activas</div>
+                </div>
+            </div>
+        </div>
+    """
+
+    _hero_en = """
+        <div style="position:relative;border-radius:16px;overflow:hidden;background:linear-gradient(135deg,#0a2a2a 0%,#0d3d35 40%,#0a2e3a 100%);padding:2.8rem 3rem;margin-bottom:1.5rem;box-shadow:0 4px 24px rgba(0,168,150,.18)">
+            <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:.08" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                    <pattern id="wavep2" x="0" y="0" width="120" height="40" patternUnits="userSpaceOnUse"><path d="M0 20 Q30 5 60 20 Q90 35 120 20" stroke="#00e5b4" stroke-width="1.5" fill="none"/></pattern>
+                    <pattern id="dotsp2" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse"><circle cx="15" cy="15" r="1.2" fill="#00d4ff"/></pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#dotsp2)"/>
+                <rect width="100%" height="100%" fill="url(#wavep2)" opacity="0.6"/>
+            </svg>
+            <svg style="position:absolute;right:2rem;top:50%;transform:translateY(-50%);opacity:.12;width:160px;height:160px" viewBox="0 0 160 160">
+                <ellipse cx="80" cy="80" rx="70" ry="30" stroke="#00d4ff" stroke-width="1" fill="none" stroke-dasharray="4 3"/>
+                <ellipse cx="80" cy="80" rx="50" ry="50" stroke="#00e5b4" stroke-width="0.8" fill="none" stroke-dasharray="3 4"/>
+                <circle cx="80" cy="50" r="5" fill="#00d4ff"/>
+                <rect x="75" y="46" width="10" height="8" fill="none" stroke="#00d4ff" stroke-width="0.8"/>
+                <rect x="64" y="49" width="10" height="3" fill="#00d4ff" opacity=".6"/>
+                <rect x="86" y="49" width="10" height="3" fill="#00d4ff" opacity=".6"/>
+            </svg>
+            <div style="position:relative;z-index:1;max-width:75%">
+                <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.25);border-radius:999px;padding:3px 12px;margin-bottom:1rem">
+                    <span style="width:6px;height:6px;border-radius:50%;background:#39d98a;display:inline-block"></span>
+                    <span style="font-size:11px;font-weight:600;letter-spacing:.08em;color:#00d4ff;font-family:DM Sans,sans-serif;text-transform:uppercase">Active monitoring · Sentinel-2</span>
+                </div>
+                <div style="font-family:Cabinet Grotesk,sans-serif;font-size:clamp(1.4rem,2.5vw,2rem);font-weight:900;color:#fff;line-height:1.15;letter-spacing:-.02em;margin-bottom:.75rem">
+                    Satellite surveillance of<br><span style="color:#00e5b4">cyanobacteria</span> in reservoirs
+                </div>
+                <div style="font-size:13px;color:rgba(255,255,255,.6);font-family:DM Sans,sans-serif;line-height:1.6;max-width:520px">
+                    Historical reconstruction and near real-time monitoring of cyanobacterial blooms in Spanish reservoirs using Sentinel-2 remote sensing · <span style="color:#00e5b4;font-weight:500">PID2023-153234OB-I00</span>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:1.25rem;flex-wrap:wrap">
+                    <div style="background:rgba(0,229,180,.12);border:1px solid rgba(0,229,180,.25);border-radius:8px;padding:6px 14px;font-size:12px;color:#00e5b4;font-family:DM Sans,sans-serif;font-weight:500">🛰 24 reservoirs</div>
+                    <div style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.25);border-radius:8px;padding:6px 14px;font-size:12px;color:#00d4ff;font-family:DM Sans,sans-serif;font-weight:500">📅 Since 2017</div>
+                    <div style="background:rgba(240,165,0,.12);border:1px solid rgba(240,165,0,.25);border-radius:8px;padding:6px 14px;font-size:12px;color:#f0a500;font-family:DM Sans,sans-serif;font-weight:500">⚠ 3 active alerts</div>
+                </div>
+            </div>
+        </div>
+    """
+
+    # ── DIAGRAMA FLUJO SENTINEL-2 ───────────────────────────────
+    _diagram_es = """
+        <div style="background:#fff;border:1px solid #e2ecf0;border-radius:16px;padding:1.5rem 2rem;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(15,31,46,.06)">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#8fa3b0;margin-bottom:1.25rem;display:flex;align-items:center;gap:8px">
+                <span>Flujo de datos · de satélite a alerta</span>
+                <span style="flex:1;height:1px;background:#e2ecf0;display:block"></span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr;gap:0;align-items:center">
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#e6f7f5;border:2px solid #00a896;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">🛰</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Sentinel-2</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">Imagen multiespectral<br>cada 5 días</div>
+                </div>
+                <div style="text-align:center;color:#00a896;font-size:20px;font-weight:300;padding-bottom:18px">→</div>
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#e6f7f5;border:2px solid #00a896;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">☁</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Google Earth Engine</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">Filtrado de nubes<br>y preprocesado L2A</div>
+                </div>
+                <div style="text-align:center;color:#00a896;font-size:20px;font-weight:300;padding-bottom:18px">→</div>
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#e6f7f5;border:2px solid #00a896;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">📐</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Índices espectrales</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">MCI · NDCI · PCI<br>Chl-a · Ficocianina</div>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr;margin-top:4px">
+                <div></div><div></div>
+                <div style="text-align:center;color:#00a896;font-size:20px">↓</div>
+                <div></div><div></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr;gap:0;align-items:center;margin-top:4px">
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#fef3c7;border:2px solid #f59e0b;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">🚨</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Alerta de bloom</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">Nivel de riesgo<br>y notificación</div>
+                </div>
+                <div style="text-align:center;color:#00a896;font-size:20px;font-weight:300;padding-bottom:18px">←</div>
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#e6f7f5;border:2px solid #00a896;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">📊</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Calibración in situ</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">Ajuste con datos<br>de campo medidos</div>
+                </div>
+                <div style="text-align:center;color:#00a896;font-size:20px;font-weight:300;padding-bottom:18px">←</div>
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#e6f7f5;border:2px solid #00a896;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">🗺</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Mapas de concentración</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">Clorofila-a y<br>ficocianina (µg/L)</div>
+                </div>
+            </div>
+        </div>
+    """
+
+    _diagram_en = """
+        <div style="background:#fff;border:1px solid #e2ecf0;border-radius:16px;padding:1.5rem 2rem;margin-bottom:1.5rem;box-shadow:0 1px 3px rgba(15,31,46,.06)">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#8fa3b0;margin-bottom:1.25rem;display:flex;align-items:center;gap:8px">
+                <span>Data flow · from satellite to alert</span>
+                <span style="flex:1;height:1px;background:#e2ecf0;display:block"></span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr;gap:0;align-items:center">
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#e6f7f5;border:2px solid #00a896;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">🛰</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Sentinel-2</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">Multispectral image<br>every 5 days</div>
+                </div>
+                <div style="text-align:center;color:#00a896;font-size:20px;font-weight:300;padding-bottom:18px">→</div>
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#e6f7f5;border:2px solid #00a896;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">☁</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Google Earth Engine</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">Cloud filtering<br>& L2A preprocessing</div>
+                </div>
+                <div style="text-align:center;color:#00a896;font-size:20px;font-weight:300;padding-bottom:18px">→</div>
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#e6f7f5;border:2px solid #00a896;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">📐</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Spectral indices</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">MCI · NDCI · PCI<br>Chl-a · Phycocyanin</div>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr;margin-top:4px">
+                <div></div><div></div>
+                <div style="text-align:center;color:#00a896;font-size:20px">↓</div>
+                <div></div><div></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr;gap:0;align-items:center;margin-top:4px">
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#fef3c7;border:2px solid #f59e0b;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">🚨</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Bloom alert</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">Risk level<br>& notification</div>
+                </div>
+                <div style="text-align:center;color:#00a896;font-size:20px;font-weight:300;padding-bottom:18px">←</div>
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#e6f7f5;border:2px solid #00a896;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">📊</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">In-situ calibration</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">Tuned with field<br>measurements</div>
+                </div>
+                <div style="text-align:center;color:#00a896;font-size:20px;font-weight:300;padding-bottom:18px">←</div>
+                <div style="text-align:center;padding:.5rem">
+                    <div style="width:54px;height:54px;border-radius:50%;background:#e6f7f5;border:2px solid #00a896;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:24px">🗺</div>
+                    <div style="font-size:12px;font-weight:700;color:#0f1f2e;margin-bottom:.2rem;font-family:DM Sans,sans-serif">Concentration maps</div>
+                    <div style="font-size:11px;color:#8fa3b0;font-family:DM Sans,sans-serif;line-height:1.4">Chl-a &<br>phycocyanin (µg/L)</div>
+                </div>
+            </div>
+        </div>
+    """
+
+    # ==== Contenido bilingüe ====
+    if lang() == "es":
+        st.markdown(_hero_es, unsafe_allow_html=True)
+        st.markdown(_diagram_es, unsafe_allow_html=True)
     # ==== Contenido bilingüe ====
     if lang() == "es":
         st.markdown("""
